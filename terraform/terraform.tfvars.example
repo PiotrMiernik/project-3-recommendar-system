@@ -1,0 +1,17 @@
+# Example Terraform variables file
+# Copy this file to terraform.tfvars
+# and fill in real values (do NOT commit secrets)
+
+aws_region = "eu-central-1"
+
+project_name = "project3-recommender"
+
+s3_bucket_name = "project3-recommender-data-lake-123456"
+
+# RDS configuration
+db_name     = "recommender"
+db_username = "recommender_admin"
+db_password = "CHANGE_ME"
+
+# Networking (restrict to your public IP /32)
+allowed_cidr_blocks = ["X.X.X.X/32"]
