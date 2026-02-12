@@ -32,6 +32,7 @@ variable "db_username" {
 variable "db_password" {
     description = "Master password for PostgresSQL database"
     type = string
+    sensitive = true
 }
 
 variable "db_instance_class" {
