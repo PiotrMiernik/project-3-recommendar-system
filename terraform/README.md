@@ -1,7 +1,5 @@
 # Project 3 – Recommender System
 
-## Terraform Infrastructure (Stage 1)
-
 This directory contains Infrastructure as Code (IaC) definitions for the AWS resources used in Project 3.
 
 ---
