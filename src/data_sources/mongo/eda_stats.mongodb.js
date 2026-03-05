@@ -21,7 +21,7 @@ db.reviews_raw.aggregate([
       total_reviews: { $sum: 1 }
     }
   }
-]).pretty();
+]).toArray();
 
 
 // Rating distribution (Check for data imbalance)
