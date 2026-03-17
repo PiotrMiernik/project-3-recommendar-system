@@ -1,23 +1,22 @@
--- Purpose:
---   Load Amazon product metadata from a JSONL staging table (products_raw_stg)
---   into the target table (products_raw) in PostgreSQL.
---
--- Key problems handled:
---   1) Some lines in the source JSONL are NOT valid JSON (e.g., embedded HTML/CSS with unescaped quotes).
---      -> We use safe_jsonb(text) to return NULL instead of failing the whole load.
---   2) The staging batch may contain duplicate ASINs.
---      -> We de-duplicate with DISTINCT ON (asin) before INSERT...ON CONFLICT, to avoid:
---         "ON CONFLICT DO UPDATE command cannot affect row a second time"
+/* 
+Purpose:
+   - Load Amazon product metadata from a JSONL staging table (products_raw_stg) into the target table (products_raw) in PostgreSQL.
+Key problems handled:
+   - Some lines in the source JSONL are NOT valid JSON (e.g., embedded HTML/CSS with unescaped quotes).
+     We use safe_jsonb(text) to return NULL instead of failing the whole load.
+   - The staging batch may contain duplicate ASINs.
+     We de-duplicate with DISTINCT ON (asin) before INSERT...ON CONFLICT, to avoid:
+     "ON CONFLICT DO UPDATE command cannot affect row a second time"
+*/
 
 BEGIN;
 
--- 1) Ensure staging table exists (no-op if it already exists)
+-- Ensure staging table exists (no-op if it already exists)
 CREATE TABLE IF NOT EXISTS public.products_raw_stg (
   line TEXT NOT NULL
 );
 
--- 2) Create/replace a safe JSON parser:
---    Returns NULL for invalid JSON instead of raising an error.
+-- Create/replace a safe JSON parser: returns NULL for invalid JSON instead of raising an error.
 CREATE OR REPLACE FUNCTION public.safe_jsonb(t text)
 RETURNS jsonb
 LANGUAGE plpgsql
@@ -30,11 +29,13 @@ EXCEPTION WHEN others THEN
 END;
 $$;
 
--- 3) Load into target table:
---    - parse JSON safely
---    - keep only valid JSON rows with non-empty ASIN
---    - de-duplicate per ASIN within this batch (choose the "largest" record by line length)
---    - upsert into products_raw
+-- Load into target table:
+/*
+- parse JSON safely
+- keep only valid JSON rows with non-empty ASIN
+- de-duplicate per ASIN within this batch (choose the "largest" record by line length)
+- upsert into products_raw
+*/
 WITH parsed AS (
   SELECT public.safe_jsonb(line) AS j, line
   FROM public.products_raw_stg
@@ -109,11 +110,11 @@ SET
   updated_at = now()
 ;
 
--- 5) Post-load verification (counts in the target table)
+-- Post-load verification (counts in the target table)
 SELECT COUNT(*) AS products_raw_rows FROM public.products_raw;
 SELECT COUNT(DISTINCT asin) AS products_raw_distinct_asin FROM public.products_raw;
 
--- 6) Clean up staging only after a successful load
+-- Clean up staging only after a successful load
 TRUNCATE public.products_raw_stg;
 
 COMMIT;
