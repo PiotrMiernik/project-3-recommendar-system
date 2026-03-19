@@ -1,3 +1,6 @@
+# This module provides helper functions for building ingestion manifests,
+# which describe what data was written to S3 during a specific run (data ingestion run metadata).
+
 def build_manifest(
     source_name: str,
     ingest_dt: str,
@@ -12,6 +15,8 @@ def build_manifest(
     watermark_in: str | int | None = None,
     watermark_out: str | int | None = None,
 ) -> dict:
+# Builds a manifest dictionary describing a single ingestion run,
+# including source, S3 location, file list, record counts, and incremental metadata.
     return {
         "manifest_version": "1.0",
         "source": {

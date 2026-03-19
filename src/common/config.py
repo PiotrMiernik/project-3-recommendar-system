@@ -1,14 +1,21 @@
+# This module is responsible for loading configuration from the .env file
+# and providing it as a unified settings dictionary for the entire project.
+
 import os
 from pathlib import Path
 
 from dotenv import load_dotenv
 
+# Retrieves a required environment variable.
+# Raises an error if the variable is missing or empty.
 def get_required_env(var_name: str) -> str:
     value = os.getenv(var_name)
     if value is None or value.strip() == "":
         raise ValueError(f"Missing required environment variable: {var_name}")
     return value
 
+# Loads environment variables from config/.env and returns all settings
+# as a dictionary used across ingestion, Airflow, and future pipelines.
 def load_settings() -> dict:
     project_root = Path(__file__).resolve().parents[1]
     env_path = project_root / "config" / ".env"
