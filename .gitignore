@@ -1,8 +1,19 @@
+# Python
 .venv/
 __pycache__/
 *.pyc
 .env
-terraform.tfvars
 data/
+
+# IDE
 .vscode/
-test.sql    
+
+# Database / SQL
+test.sql
+
+# Terraform
+.terraform/          
+*.tfstate            
+*.tfstate.backup
+terraform.tfvars      
+.terraform.lock.hcl   
