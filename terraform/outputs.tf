@@ -2,8 +2,6 @@
 # - Provide the key infrastructure values after `terraform apply`
 # - Make it easy to populate config/.env for local Airflow and scripts
 
-
-
 # S3
 output "s3_bucket_name" {
   description = "Main S3 data lake bucket name (prefixes: raw/, silver/, gold/)"
@@ -11,25 +9,13 @@ output "s3_bucket_name" {
 }
 
 
-# RDS PostgreSQL
-output "rds_endpoint" {
-  description = "RDS PostgreSQL endpoint (hostname)"
-  value       = aws_db_instance.postgres.address
+# RDS PostgreSQL (endpoint and port for existing RDS instance)
+output "existing_rds_endpoint" {
+  value = data.aws_db_instance.existing.address
 }
 
-output "rds_port" {
-  description = "RDS PostgreSQL port"
-  value       = aws_db_instance.postgres.port
-}
-
-output "rds_db_name" {
-  description = "RDS database name"
-  value       = aws_db_instance.postgres.db_name
-}
-
-output "rds_username" {
-  description = "RDS master username"
-  value       = aws_db_instance.postgres.username
+output "existing_rds_port" {
+  value = data.aws_db_instance.existing.port
 }
 
 

@@ -17,40 +17,9 @@ variable "s3_bucket_name" {
     type = string
 }
 
-# RDS / PostgresSQL
+# RDS / PostgreSQL
 
-variable "db_name" {
-    description = "PostgresSQL database name"
-    type = string
-}
-
-variable "db_username" {
-    description = "Master username for PostgresSQL database"
-    type = string
-}
-
-variable "db_password" {
-    description = "Master password for PostgresSQL database"
-    type = string
-    sensitive = true
-}
-
-variable "db_instance_class" {
-  description = "RDS instance class"
+variable "existing_rds_instance_identifier" {
+  description = "Identifier of the existing RDS PostgreSQL instance used by the project"
   type        = string
-  default     = "db.t4g.micro"
-}
-
-variable "db_allocated_storage_gb" {
-  description = "Allocated storage for RDS in GB"
-  type        = number
-  default     = 20
-}
-
-# Networking / Security
-
-variable "allowed_cidr_blocks" {
-    description = "List of CIDR blocks allowed to connect to RDS"
-    type        = list(string)
-    default     = []
 }

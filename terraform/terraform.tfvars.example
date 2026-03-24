@@ -9,9 +9,4 @@ project_name = "project3-recommender"
 s3_bucket_name = "project3-recommender-data-lake-123456"
 
 # RDS configuration
-db_name     = "recommender"
-db_username = "recommender_admin"
-db_password = "CHANGE_ME"
-
-# Networking (restrict to your public IP /32)
-allowed_cidr_blocks = ["X.X.X.X/32"]
+existing_rds_instance_identifier = "rds-instance-name"
