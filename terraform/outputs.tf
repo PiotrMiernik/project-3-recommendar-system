@@ -26,18 +26,8 @@ output "orchestrator_role_arn" {
 }
 
 
-# IAM (EMR roles)
-output "emr_service_role_arn" {
-  description = "EMR service role ARN (used by EMR control plane)"
-  value       = aws_iam_role.emr_service_role.arn
-}
-
-output "emr_ec2_role_arn" {
-  description = "EMR EC2 role ARN (used by EC2 instances in the EMR cluster)"
-  value       = aws_iam_role.emr_ec2_role.arn
-}
-
-output "emr_ec2_instance_profile_name" {
-  description = "EMR EC2 instance profile name (to attach to EMR cluster instances)"
-  value       = aws_iam_instance_profile.emr_ec2_instance_profile.name
+# IAM (EMR Serverless)
+output "emr_serverless_runtime_role_arn" {
+  description = "IAM role ARN used by EMR Serverless jobs (runtime role)"
+  value       = aws_iam_role.emr_serverless_runtime_role.arn
 }
