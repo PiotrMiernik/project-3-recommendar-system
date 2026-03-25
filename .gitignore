@@ -17,3 +17,9 @@ test.sql
 *.tfstate.backup
 terraform.tfvars      
 .terraform.lock.hcl   
+
+.airflow/
+airflow_home/
+.venv/
+__pycache__/
+*.db
