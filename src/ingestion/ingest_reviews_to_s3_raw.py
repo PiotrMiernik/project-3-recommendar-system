@@ -29,7 +29,7 @@ def fetch_reviews_in_batches(collection, chunk_size: int):
         list[dict]: Batch of review documents as dictionaries.
     """
     # Create a cursor to iterate through the full collection in batches
-    cursor = collection.find({}, no_cursor_timeout=True).batch_size(chunk_size)
+    cursor = collection.find({}).batch_size(chunk_size)
 
     batch = []
 
@@ -59,6 +59,7 @@ def main() -> None:
     Returns:
         None
     """
+
     # Load configuration from .env file
     settings = load_settings()
 
@@ -79,6 +80,10 @@ def main() -> None:
     client = MongoClient(settings["mongodb_uri"])
     db = client[settings["mongodb_db"]]
     collection = db[settings["mongodb_collection_reviews"]]
+
+    # Total number of documents in data source
+    total_in_db = collection.count_documents({})
+    logger.info(f"Total documents found in MongoDB collection: {total_in_db}")
 
     uploaded_file_keys = []
     total_records = 0
@@ -138,6 +143,14 @@ def main() -> None:
             f"Finished reviews ingestion successfully. Uploaded {total_records} records "
             f"into {len(uploaded_file_keys)} file(s)."
         )
+
+        if total_records == total_in_db:
+            logger.info(f"SUCCESS: Data integrity check passed ({total_records}/{total_in_db})")
+        else:
+            logger.warning(
+                f"WARNING: Data mismatch! Source has {total_in_db} records, "
+                f"but only {total_records} were uploaded."
+            )
 
     finally:
         # Ensure MongoDB client is always closed

@@ -17,7 +17,7 @@ def get_required_env(var_name: str) -> str:
 # Loads environment variables from config/.env and returns all settings
 # as a dictionary used across ingestion, Airflow, and future pipelines.
 def load_settings() -> dict:
-    project_root = Path(__file__).resolve().parents[1]
+    project_root = Path(__file__).resolve().parents[2]
     env_path = project_root / "config" / ".env"
 
     load_dotenv(env_path)

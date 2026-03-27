@@ -30,6 +30,7 @@ def fetch_products_in_batches(connection, chunk_size: int):
         list[dict]: Batch of product records as dictionaries.
     """
     # Use a named cursor (server-side) to avoid loading all data into memory
+    # Named cursors are managed by the server, which is better for large datasets
     with connection.cursor(name="products_raw_cursor", cursor_factory=RealDictCursor) as cursor:
         cursor.itersize = chunk_size
         cursor.execute("SELECT * FROM products_raw")
@@ -76,11 +77,18 @@ def main() -> None:
         password=settings["rds_password"],
     )
 
-    uploaded_file_keys = []
-    total_records = 0
-
     try:
-        # Iterate over batches fetched from PostgreSQL
+        # 1. Get total number of records in data source before starting
+        with connection.cursor() as temp_cursor:
+            temp_cursor.execute("SELECT COUNT(*) FROM products_raw")
+            total_in_db = temp_cursor.fetchone()[0]
+        
+        logger.info(f"Total rows found in Postgres table: {total_in_db}")
+
+        uploaded_file_keys = []
+        total_records = 0
+
+        # 2. Iterate over batches fetched from PostgreSQL
         for part_number, batch in enumerate(fetch_products_in_batches(connection, chunk_size)):
             # Build S3 key for current chunk
             part_key = build_part_key("products", ingest_dt, part_number)
@@ -101,7 +109,7 @@ def main() -> None:
             uploaded_file_keys.append(part_key)
             total_records += len(batch)
 
-        # Build manifest describing the ingestion run
+        # 3. Build manifest describing the ingestion run
         manifest = build_manifest(
             source_name="products",
             ingest_dt=ingest_dt,
@@ -134,6 +142,19 @@ def main() -> None:
             f"Finished products ingestion successfully. Uploaded {total_records} records "
             f"into {len(uploaded_file_keys)} file(s)."
         )
+
+        # 4. Final data integrity check
+        if total_records == total_in_db:
+            logger.info(f"SUCCESS: Data integrity check passed ({total_records}/{total_in_db})")
+        else:
+            logger.warning(
+                f"WARNING: Data mismatch! Source has {total_in_db} records, "
+                f"but only {total_records} were uploaded."
+            )
+
+    except Exception as e:
+        logger.error(f"Ingestion failed: {str(e)}")
+        raise
 
     finally:
         # Ensure database connection is always closed
