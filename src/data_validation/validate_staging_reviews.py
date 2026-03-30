@@ -1,0 +1,249 @@
+import argparse
+import json
+from pathlib import Path
+
+import great_expectations as gx
+import pandas as pd
+
+from src.common.config import load_settings
+from src.common.logging import get_logger
+
+
+logger = get_logger(__name__)
+
+ENTITY = "reviews"
+
+# ARGUMENTS
+def parse_args():
+    """
+    Parse CLI arguments.
+    --ingest-dt: partition date to validate
+    --output-dir: local directory where validation results will be saved
+    """
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--ingest-dt", required=True, help="Partition date in format YYYY-MM-DD")
+    parser.add_argument(
+        "--output-dir",
+        default="gx_results",
+        help="Directory for saving validation results",
+    )
+    return parser.parse_args()
+
+
+# S3 PATH RESOLUTION
+def build_partition_path(settings: dict, ingest_dt: str) -> str:
+    """
+    Build S3 path for a specific staging partition.
+    Example:
+    s3://bucket/staging/reviews/ingest_dt=YYYY-MM-DD/
+    """
+    bucket = settings["s3_bucket"]
+    prefix = settings["s3_silver_prefix"]  # naming kept consistent with config.py
+    return f"s3://{bucket}/{prefix}{ENTITY}/ingest_dt={ingest_dt}/"
+
+
+# DATA LOADING
+def read_staging_partition(partition_path: str, aws_region: str) -> pd.DataFrame:
+    """
+    Load Parquet data from S3 staging into Pandas DataFrame.
+    Uses pyarrow + s3fs under the hood.
+    """
+    logger.info(f"Reading staging data from: {partition_path}")
+
+    df = pd.read_parquet(
+        partition_path,
+        engine="pyarrow",
+        storage_options={"client_kwargs": {"region_name": aws_region}},
+    )
+
+    if df.empty:
+        raise ValueError(f"Staging partition is empty: {partition_path}")
+
+    return df
+
+
+# GREAT EXPECTATIONS SETUP
+def build_batch(df: pd.DataFrame):
+    """
+    Create a Great Expectations batch from Pandas DataFrame.
+    """
+    context = gx.get_context()
+
+    data_source = context.data_sources.add_pandas("staging_reviews_ds")
+    data_asset = data_source.add_dataframe_asset(name="staging_reviews_asset")
+    batch_definition = data_asset.add_batch_definition_whole_dataframe(
+        "staging_reviews_batch"
+    )
+
+    batch = batch_definition.get_batch(batch_parameters={"dataframe": df})
+
+    return batch
+
+
+# EXPECTATIONS
+def build_expectations():
+    """
+    Define all expectations for staging_reviews.
+    """
+    return [
+
+        # asin must not be null → item identifier is required for downstream joins and recommender logic
+        gx.expectations.ExpectColumnValuesToNotBeNull(
+            column="asin",
+            severity="critical",
+        ),
+
+        # reviewer_id must not be null → user identifier is required for user-item interactions
+        gx.expectations.ExpectColumnValuesToNotBeNull(
+            column="reviewer_id",
+            severity="critical",
+        ),
+
+        # review_id must be unique → ensures no duplicated reviews after technical deduplication
+        gx.expectations.ExpectColumnValuesToBeUnique(
+            column="review_id",
+            severity="critical",
+        ),
+
+        # rating must be within the expected review score range
+        gx.expectations.ExpectColumnValuesToBeBetween(
+            column="rating",
+            min_value=1.0,
+            max_value=5.0,
+            severity="critical",
+        ),
+
+        # review_time must be present after parsing → confirms that date parsing worked correctly
+        gx.expectations.ExpectColumnValuesToNotBeNull(
+            column="review_time",
+            severity="critical",
+        ),
+
+        # review_text should be a string-like field → useful for downstream NLP / embeddings
+        gx.expectations.ExpectColumnValuesToBeInTypeList(
+            column="review_text",
+            type_list=["str", "string"],
+            severity="warning",
+        ),
+    ]
+
+
+# VALIDATION
+def normalize_result(result) -> dict:
+    """
+    Normalize GX result object to dictionary format.
+    Handles multiple GX return types.
+    """
+    if hasattr(result, "to_json_dict"):
+        return result.to_json_dict()
+
+    if isinstance(result, dict):
+        return result
+
+    if hasattr(result, "model_dump"):
+        return result.model_dump()
+
+    return {"raw_result": str(result)}
+
+
+def extract_success(result_dict: dict) -> bool:
+    """
+    Extract success flag from GX result.
+    """
+    return bool(result_dict.get("success", False))
+
+
+def run_validation(df: pd.DataFrame):
+    """
+    Execute all expectations against the dataset.
+    Returns overall success flag and detailed results.
+    """
+    batch = build_batch(df)
+    expectations = build_expectations()
+
+    results = []
+
+    for expectation in expectations:
+        result = batch.validate(expectation)
+        result_dict = normalize_result(result)
+
+        results.append(result_dict)
+
+        expectation_type = (
+            result_dict.get("expectation_config", {}).get("type")
+            or result_dict.get("expectation_type")
+            or type(expectation).__name__
+        )
+
+        success = extract_success(result_dict)
+
+        logger.info(f"{expectation_type} → success={success}")
+
+    overall_success = all(extract_success(r) for r in results)
+
+    return overall_success, results
+
+
+# SAVE RESULTS
+def save_results(output_dir: str, ingest_dt: str, partition_path: str, success: bool, results: list):
+    """
+    Save validation results to local JSON file.
+    """
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
+
+    output_path = Path(output_dir) / f"validate_staging_reviews_{ingest_dt}.json"
+
+    payload = {
+        "entity": ENTITY,
+        "ingest_dt": ingest_dt,
+        "partition_path": partition_path,
+        "success": success,
+        "expectations": results,
+    }
+
+    output_path.write_text(
+        json.dumps(payload, indent=2, ensure_ascii=False, default=str),
+        encoding="utf-8",
+    )
+
+    return output_path
+
+
+# MAIN
+def main():
+    args = parse_args()
+    settings = load_settings()
+
+    logger.info("Starting validation for staging_reviews")
+
+    partition_path = build_partition_path(settings, args.ingest_dt)
+
+    try:
+        df = read_staging_partition(partition_path, settings["aws_region"])
+
+        logger.info(f"Rows: {len(df)}")
+        logger.info(f"Columns: {list(df.columns)}")
+
+        success, results = run_validation(df)
+
+        result_path = save_results(
+            args.output_dir,
+            args.ingest_dt,
+            partition_path,
+            success,
+            results,
+        )
+
+        logger.info(f"Validation results saved: {result_path}")
+        logger.info(f"Validation success: {success}")
+
+        if not success:
+            raise ValueError("Validation failed for staging_reviews")
+
+    except Exception as exc:
+        logger.exception(f"Validation failed: {exc}")
+        raise
+
+
+if __name__ == "__main__":
+    main()
