@@ -188,12 +188,23 @@ def run_validation(df: pd.DataFrame):
 
         success = extract_success(result_dict)
 
-        logger.info(f"{expectation_type} → success={success}")
+        result_details = result_dict.get("result", {})
+        unexpected_count = result_details.get("unexpected_count")
+        unexpected_percent = result_details.get("unexpected_percent")
+        partial_unexpected = result_details.get("partial_unexpected_list")
+
+        logger.info(
+            f"{expectation_type} → success={success} | "
+            f"unexpected_count={unexpected_count} | "
+            f"unexpected_percent={unexpected_percent}"
+        )
+
+        if not success and partial_unexpected:
+            logger.warning(f"{expectation_type} sample unexpected values: {partial_unexpected[:5]}")
 
     overall_success = all(extract_success(r) for r in results)
 
     return overall_success, results
-
 
 # SAVE RESULTS
 def save_results(output_dir: str, ingest_dt: str, partition_path: str, success: bool, results: list):
