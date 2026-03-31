@@ -31,3 +31,8 @@ output "emr_serverless_runtime_role_arn" {
   description = "IAM role ARN used by EMR Serverless jobs (runtime role)"
   value       = aws_iam_role.emr_serverless_runtime_role.arn
 }
+
+output "emr_serverless_application_id" {
+  description = "ID of the EMR Serverless Application"
+  value       = aws_emrserverless_application.spark.id
+}

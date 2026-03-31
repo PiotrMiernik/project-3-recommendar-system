@@ -293,3 +293,17 @@ def run_products_transformation(manifest_key: str) -> None:
                 staging_df.unpersist()
         finally:
             spark.stop()
+
+
+# Script entrypoint for EMR Serverless
+if __name__ == "__main__":
+    import sys
+
+    if len(sys.argv) != 2:
+        raise ValueError(
+            "Expected exactly one argument: manifest_key. "
+            "Usage: spark-submit transform_raw_products_to_staging.py <manifest_key>"
+        )
+
+    manifest_key = sys.argv[1]
+    run_products_transformation(manifest_key=manifest_key)
