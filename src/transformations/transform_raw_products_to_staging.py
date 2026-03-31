@@ -1,8 +1,5 @@
-import argparse
-from typing import List
-
 from pyspark import StorageLevel
-from pyspark.sql import SparkSession, DataFrame, Window
+from pyspark.sql import DataFrame, SparkSession, Window
 from pyspark.sql import functions as F
 
 from src.common.config import load_settings
@@ -34,14 +31,12 @@ FINAL_COLUMNS = [
     "source_system",
 ]
 
-# ARGUMENTS
-def parse_args():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--manifest-key", required=True)
-    return parser.parse_args()
 
-# SPARK
-def create_spark():
+# Spark session
+def create_spark() -> SparkSession:
+    """
+    Create and return a Spark session for the transformation job.
+    """
     return (
         SparkSession.builder.appName("transform-products-raw-to-staging")
         .config("spark.sql.sources.partitionOverwriteMode", "dynamic")
@@ -49,8 +44,13 @@ def create_spark():
         .getOrCreate()
     )
 
-# MANIFEST
+
+# Manifest handling
 def load_manifest(settings: dict, manifest_key: str) -> dict:
+    """
+    Load ingestion manifest from S3.
+    The manifest defines which raw files belong to the current ingestion run.
+    """
     manifest = read_json_from_s3(
         bucket=settings["s3_bucket"],
         key=manifest_key,
@@ -63,7 +63,10 @@ def load_manifest(settings: dict, manifest_key: str) -> dict:
     return manifest
 
 
-def extract_input_paths(settings: dict, manifest: dict) -> List[str]:
+def extract_input_paths(settings: dict, manifest: dict) -> list[str]:
+    """
+    Resolve full S3 input paths from manifest file entries.
+    """
     bucket = settings["s3_bucket"]
     files = manifest["s3"]["files"]
 
@@ -74,6 +77,9 @@ def extract_input_paths(settings: dict, manifest: dict) -> List[str]:
 
 
 def extract_ingest_dt(manifest: dict) -> str:
+    """
+    Extract ingest date from manifest metadata.
+    """
     ingest_dt = manifest["run"]["ingest_dt"]
 
     if not ingest_dt:
@@ -81,8 +87,13 @@ def extract_ingest_dt(manifest: dict) -> str:
 
     return ingest_dt
 
-# VALIDATION
-def validate_required_columns(df: DataFrame):
+
+# Technical validation
+def validate_required_columns(df: DataFrame) -> None:
+    """
+    Validate that the raw dataset contains the full expected input contract.
+    This is a technical schema validation, not a business-quality check.
+    """
     required = {
         "asin",
         "title",
@@ -100,17 +111,27 @@ def validate_required_columns(df: DataFrame):
         "ingest_dt",
         "updated_at",
     }
+
     missing = required - set(df.columns)
 
     if missing:
         raise ValueError(f"Missing required columns: {sorted(missing)}")
 
-# TRANSFORMATIONS
+
+# Column normalization helpers
 def normalize_string(col):
+    """
+    Trim string values and convert empty strings to null.
+    """
     return F.when(F.trim(col) == "", None).otherwise(F.trim(col))
 
 
 def ensure_array(col):
+    """
+    Ensure a column is represented as array<string>.
+    If the value is null, return an empty array.
+    If the value is scalar, wrap it into a single-element array.
+    """
     return (
         F.when(col.isNull(), F.array().cast("array<string>"))
         .when(col.cast("array<string>").isNotNull(), col.cast("array<string>"))
@@ -119,11 +140,18 @@ def ensure_array(col):
 
 
 def parse_price(col):
+    """
+    Extract numeric price from raw price string.
+    Invalid or non-numeric values are converted to null.
+    """
     value = F.regexp_extract(col, r"(\d+(?:\.\d+)?)", 1)
     return F.when(value == "", None).otherwise(value.cast("double"))
 
 
 def rename_columns(df: DataFrame) -> DataFrame:
+    """
+    Standardize raw column names to the staging naming convention.
+    """
     return (
         df.withColumnRenamed("main_cat", "main_category")
         .withColumnRenamed("category", "categories")
@@ -132,17 +160,29 @@ def rename_columns(df: DataFrame) -> DataFrame:
     )
 
 
+# Core transformation
 def transform(df: DataFrame, ingest_dt: str) -> DataFrame:
+    """
+    Transform raw products data into staging schema.
+    Includes:
+    - column renaming
+    - type normalization
+    - technical validation after casting
+    - deduplication by asin
+    """
     df = rename_columns(df)
 
+    # Normalize selected string columns
     for col_name in ["asin", "title", "brand", "main_category", "similar_item", "date_raw"]:
         if col_name in df.columns:
             df = df.withColumn(col_name, normalize_string(F.col(col_name)))
 
+    # Normalize selected array-like columns
     for col_name in ["categories", "description", "features", "rank_raw", "also_buy", "also_view"]:
         if col_name in df.columns:
             df = df.withColumn(col_name, ensure_array(F.col(col_name)))
 
+    # Cast and enrich technical metadata
     df = (
         df.withColumn("price", parse_price(F.col("price_raw")))
         .withColumn("updated_at", F.to_timestamp("updated_at"))
@@ -150,6 +190,7 @@ def transform(df: DataFrame, ingest_dt: str) -> DataFrame:
         .withColumn("source_system", F.lit(SOURCE_SYSTEM))
     )
 
+    # Validate critical fields after transformation
     invalid_asin_count = df.filter(F.col("asin").isNull()).count()
     if invalid_asin_count > 0:
         raise ValueError(f"Found {invalid_asin_count} records with null asin after normalization.")
@@ -164,6 +205,7 @@ def transform(df: DataFrame, ingest_dt: str) -> DataFrame:
     if invalid_ingest_dt_count > 0:
         raise ValueError("ingest_dt could not be parsed.")
 
+    # Keep only the latest version of each product
     window = Window.partitionBy("asin").orderBy(F.col("updated_at").desc_nulls_last())
 
     df = (
@@ -172,14 +214,20 @@ def transform(df: DataFrame, ingest_dt: str) -> DataFrame:
         .drop("rn", "price_raw")
     )
 
+    # Enforce final staging schema and column order
     df = df.select(*FINAL_COLUMNS)
 
     return df
 
-# WRITE
-def write_output(df: DataFrame, settings: dict):
+
+# Output writing
+def write_output(df: DataFrame, settings: dict) -> None:
+    """
+    Write transformed data to S3 staging as Parquet,
+    partitioned by ingest_dt.
+    """
     bucket = settings["s3_bucket"]
-    prefix = settings["s3_silver_prefix"]
+    prefix = settings["s3_silver_prefix"]  # kept as-is to match current config.py
 
     output_path = f"s3://{bucket}/{prefix}{ENTITY}"
     logger.info(f"Writing output to: {output_path}")
@@ -191,20 +239,25 @@ def write_output(df: DataFrame, settings: dict):
         .parquet(output_path)
     )
 
-# MAIN FUNCTION
-def main():
-    args = parse_args()
+
+# Airflow entrypoint
+def run_products_transformation(manifest_key: str) -> None:
+    """
+    Main entrypoint for Airflow.
+    Runs the full raw -> staging transformation for products
+    based on a specific ingestion manifest.
+    """
     settings = load_settings()
     spark = create_spark()
 
     try:
         logger.info("Starting raw -> staging transformation for products")
+        logger.info(f"Manifest key: {manifest_key}")
 
-        manifest = load_manifest(settings, args.manifest_key)
+        manifest = load_manifest(settings, manifest_key)
         input_paths = extract_input_paths(settings, manifest)
         ingest_dt = extract_ingest_dt(manifest)
 
-        logger.info(f"Manifest key: {args.manifest_key}")
         logger.info(f"Resolved ingest_dt: {ingest_dt}")
         logger.info(f"Input files count: {len(input_paths)}")
 
@@ -218,6 +271,7 @@ def main():
 
         logger.info(f"Input records count: {input_count}")
 
+        # Persist the transformed DataFrame because it is reused for count() and write()
         staging_df = transform(raw_df, ingest_dt).persist(StorageLevel.MEMORY_AND_DISK)
 
         output_count = staging_df.count()
@@ -239,7 +293,3 @@ def main():
                 staging_df.unpersist()
         finally:
             spark.stop()
-
-
-if __name__ == "__main__":
-    main()

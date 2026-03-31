@@ -1,4 +1,3 @@
-import argparse
 import json
 from pathlib import Path
 
@@ -14,24 +13,7 @@ logger = get_logger(__name__)
 ENTITY = "products"
 
 
-# ARGUMENTS
-def parse_args():
-    """
-    Parse CLI arguments.
-    --ingest-dt: partition date to validate
-    --output-dir: local directory where validation results will be saved
-    """
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--ingest-dt", required=True, help="Partition date in format YYYY-MM-DD")
-    parser.add_argument(
-        "--output-dir",
-        default="gx_results",
-        help="Directory for saving validation results",
-    )
-    return parser.parse_args()
-
-
-# S3 PATH RESOLUTION
+# S3 path resolution
 def build_partition_path(settings: dict, ingest_dt: str) -> str:
     """
     Build S3 path for a specific staging partition.
@@ -39,14 +21,14 @@ def build_partition_path(settings: dict, ingest_dt: str) -> str:
     s3://bucket/staging/products/ingest_dt=YYYY-MM-DD/
     """
     bucket = settings["s3_bucket"]
-    prefix = settings["s3_silver_prefix"]  # naming kept consistent with config
+    prefix = settings["s3_silver_prefix"]  # kept as-is to match current config.py
     return f"s3://{bucket}/{prefix}{ENTITY}/ingest_dt={ingest_dt}/"
 
 
-# DATA LOADING
+# Data loading
 def read_staging_partition(partition_path: str, aws_region: str) -> pd.DataFrame:
     """
-    Load Parquet data from S3 staging into Pandas DataFrame.
+    Load Parquet data from S3 staging into a Pandas DataFrame.
     Uses pyarrow + s3fs under the hood.
     """
     logger.info(f"Reading staging data from: {partition_path}")
@@ -63,10 +45,10 @@ def read_staging_partition(partition_path: str, aws_region: str) -> pd.DataFrame
     return df
 
 
-# GREAT EXPECTATIONS SETUP
+# Great Expectations setup
 def build_batch(df: pd.DataFrame):
     """
-    Create a Great Expectations batch from Pandas DataFrame.
+    Create a Great Expectations batch from a Pandas DataFrame.
     """
     context = gx.get_context()
 
@@ -81,27 +63,25 @@ def build_batch(df: pd.DataFrame):
     return batch
 
 
-# EXPECTATIONS
+# Expectations
 def build_expectations():
     """
     Define all expectations for staging_products.
     """
-
     return [
-
-        # asin must not be null → required primary identifier
+        # asin must not be null -> required product identifier
         gx.expectations.ExpectColumnValuesToNotBeNull(
             column="asin",
             severity="critical",
         ),
 
-        # asin must be unique → ensures no duplicates after deduplication
+        # asin must be unique -> confirms deduplication worked correctly
         gx.expectations.ExpectColumnValuesToBeUnique(
             column="asin",
             severity="critical",
         ),
 
-        # title should exist in most cases → allows small % of missing values
+        # title should be present in most rows -> basic completeness check for product metadata
         gx.expectations.ExpectColumnProportionOfNonNullValuesToBeBetween(
             column="title",
             min_value=0.95,
@@ -109,28 +89,28 @@ def build_expectations():
             severity="warning",
         ),
 
-        # price must be numeric (float) → ensures proper parsing from raw string
+        # price must be numeric -> confirms raw price parsing produced a valid float column
         gx.expectations.ExpectColumnValuesToBeOfType(
             column="price",
             type_="float64",
             severity="warning",
         ),
 
-        # categories must be list-like → ensures correct schema normalization
+        # categories must be list-like -> confirms schema normalization for array fields
         gx.expectations.ExpectColumnValuesToBeInTypeList(
             column="categories",
             type_list=["list", "ndarray"],
             severity="critical",
         ),
 
-        # also_buy must be list-like → used for recommendation signals
+        # also_buy must be list-like -> required structure for downstream recommendation signals
         gx.expectations.ExpectColumnValuesToBeInTypeList(
             column="also_buy",
             type_list=["list", "ndarray"],
             severity="critical",
         ),
 
-        # also_view must be list-like → used for recommendation signals
+        # also_view must be list-like -> required structure for downstream recommendation signals
         gx.expectations.ExpectColumnValuesToBeInTypeList(
             column="also_view",
             type_list=["list", "ndarray"],
@@ -139,10 +119,10 @@ def build_expectations():
     ]
 
 
-# VALIDATION
+# Validation helpers
 def normalize_result(result) -> dict:
     """
-    Normalize GX result object to dictionary format.
+    Normalize a GX result object to dictionary format.
     Handles multiple GX return types.
     """
     if hasattr(result, "to_json_dict"):
@@ -159,7 +139,7 @@ def normalize_result(result) -> dict:
 
 def extract_success(result_dict: dict) -> bool:
     """
-    Extract success flag from GX result.
+    Extract the success flag from a GX result dictionary.
     """
     return bool(result_dict.get("success", False))
 
@@ -194,22 +174,31 @@ def run_validation(df: pd.DataFrame):
         partial_unexpected = result_details.get("partial_unexpected_list")
 
         logger.info(
-            f"{expectation_type} → success={success} | "
+            f"{expectation_type} -> success={success} | "
             f"unexpected_count={unexpected_count} | "
             f"unexpected_percent={unexpected_percent}"
         )
 
         if not success and partial_unexpected:
-            logger.warning(f"{expectation_type} sample unexpected values: {partial_unexpected[:5]}")
+            logger.warning(
+                f"{expectation_type} sample unexpected values: {partial_unexpected[:5]}"
+            )
 
     overall_success = all(extract_success(r) for r in results)
 
     return overall_success, results
 
-# SAVE RESULTS
-def save_results(output_dir: str, ingest_dt: str, partition_path: str, success: bool, results: list):
+
+# Save results
+def save_results(
+    output_dir: str,
+    ingest_dt: str,
+    partition_path: str,
+    success: bool,
+    results: list,
+):
     """
-    Save validation results to local JSON file.
+    Save validation results to a local JSON file.
     """
     Path(output_dir).mkdir(parents=True, exist_ok=True)
 
@@ -231,14 +220,21 @@ def save_results(output_dir: str, ingest_dt: str, partition_path: str, success: 
     return output_path
 
 
-# MAIN
-def main():
-    args = parse_args()
+# Airflow entrypoint
+def run_staging_products_validation(
+    ingest_dt: str,
+    output_dir: str = "gx_results",
+) -> None:
+    """
+    Main entrypoint for Airflow.
+    Runs Great Expectations validation for a single staging products partition.
+    """
     settings = load_settings()
 
     logger.info("Starting validation for staging_products")
+    logger.info(f"Target ingest_dt: {ingest_dt}")
 
-    partition_path = build_partition_path(settings, args.ingest_dt)
+    partition_path = build_partition_path(settings, ingest_dt)
 
     try:
         df = read_staging_partition(partition_path, settings["aws_region"])
@@ -249,11 +245,11 @@ def main():
         success, results = run_validation(df)
 
         result_path = save_results(
-            args.output_dir,
-            args.ingest_dt,
-            partition_path,
-            success,
-            results,
+            output_dir=output_dir,
+            ingest_dt=ingest_dt,
+            partition_path=partition_path,
+            success=success,
+            results=results,
         )
 
         logger.info(f"Validation results saved: {result_path}")
@@ -263,9 +259,5 @@ def main():
             raise ValueError("Validation failed for staging_products")
 
     except Exception as exc:
-        logger.exception(f"Validation failed: {exc}")
+        logger.exception(f"Validation failed for staging_products: {exc}")
         raise
-
-
-if __name__ == "__main__":
-    main()
