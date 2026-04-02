@@ -52,7 +52,6 @@ def run_validate_reviews_task(**context):
     ingest_dt = context["ds"]
     run_staging_reviews_validation(ingest_dt=ingest_dt)
 
-
 COMMON_CONFIGURATION_OVERRIDES = {
     "monitoringConfiguration": {
         "s3MonitoringConfiguration": {
@@ -60,28 +59,29 @@ COMMON_CONFIGURATION_OVERRIDES = {
         }
     },
     "applicationConfiguration": [
-    {
-        "classification": "spark-defaults",
-        "properties": {
-            "spark.submit.pyFiles": PY_FILES_S3_URI,
+        {
+            "classification": "spark-defaults",
+            "properties": {
+                "spark.submit.pyFiles": PY_FILES_S3_URI,
+            },
         },
-    },
-    {
-        "classification": "spark-env",
-        "configurations": [
-            {
-                "classification": "export",
-                "properties": {
-                    "AWS_REGION": "eu-central-1",
-                    "S3_BUCKET": S3_BUCKET,
-                    "S3_RAW_PREFIX": "raw/",
-                    "S3_STAGING_PREFIX": "staging/",
-                    "S3_MLREADY_PREFIX": "mlready/",
-                },
-            }
-        ],
-    },
-]
+        {
+            "classification": "spark-env",
+            "configurations": [
+                {
+                    "classification": "export",
+                    "properties": {
+                        "AWS_REGION": "eu-central-1",
+                        "S3_BUCKET": S3_BUCKET,
+                        "S3_RAW_PREFIX": "raw/",
+                        "S3_STAGING_PREFIX": "staging/",
+                        "S3_MLREADY_PREFIX": "mlready/",
+                    },
+                }
+            ],
+        },
+    ],
+}
 
 with DAG(
     dag_id="recommender_system_pipeline_prod",
