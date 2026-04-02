@@ -38,10 +38,14 @@ data "aws_iam_policy_document" "orchestrator_policy_doc" {
     sid    = "EMRServerlessManagement"
     effect = "Allow"
     actions = [
-      "emr-serverless:StartJobRun",
-      "emr-serverless:GetJobRun",
-      "emr-serverless:StopJobRun",
-      "emr-serverless:ListJobRuns"
+    "emr-serverless:GetApplication",
+    "emr-serverless:ListApplications",
+    "emr-serverless:StartApplication",
+    "emr-serverless:StopApplication",
+    "emr-serverless:StartJobRun",
+    "emr-serverless:GetJobRun",
+    "emr-serverless:CancelJobRun",
+    "emr-serverless:ListJobRuns"
     ]
     resources = ["*"]
   }

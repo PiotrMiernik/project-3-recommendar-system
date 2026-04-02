@@ -43,3 +43,14 @@ def load_settings() -> dict:
     }
 
     return settings
+
+def load_emr_transform_settings() -> dict:
+    settings = {
+        "aws_region": get_required_env("AWS_REGION"),
+        "s3_bucket": get_required_env("S3_BUCKET"),
+        "s3_raw_prefix": os.getenv("S3_RAW_PREFIX", "raw/"),
+        "s3_staging_prefix": os.getenv("S3_STAGING_PREFIX", "staging/"),
+        "s3_mlready_prefix": os.getenv("S3_MLREADY_PREFIX", "mlready/"),
+    }
+
+    return settings

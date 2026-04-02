@@ -28,55 +28,60 @@ default_args = {
     "email_on_failure": False,
     "email_on_retry": False,
     "retries": 1,
-    "retry_delay": timedelta(minutes=5),
+    "retry_delay": timedelta(minutes=2),
 }
 
-# EMR Serverless configuration
-# These values should be populated from Terraform outputs.
-# Recommended approach:
-# - save them as Airflow Variables
-# - or replace Variable.get(...) with hardcoded values after terraform apply
-EMR_SERVERLESS_APPLICATION_ID = Variable.get("project3_emr_serverless_application_id")
-EMR_SERVERLESS_EXECUTION_ROLE_ARN = Variable.get("project3_emr_serverless_runtime_role_arn")
+EMR_SERVERLESS_APPLICATION_ID = Variable.get("emr_serverless_application_id")
+EMR_SERVERLESS_EXECUTION_ROLE_ARN = Variable.get("emr_serverless_runtime_role_arn")
 
 AWS_CONN_ID = "aws_default"
 S3_BUCKET = "project-3-recommender-system"
 
-PRODUCTS_SCRIPT_S3_URI = (
-    f"s3://{S3_BUCKET}/jobs/transform_raw_products_to_staging.py"
-)
-REVIEWS_SCRIPT_S3_URI = (
-    f"s3://{S3_BUCKET}/jobs/transform_raw_reviews_to_staging.py"
-)
-
+PRODUCTS_SCRIPT_S3_URI = f"s3://{S3_BUCKET}/jobs/transform_raw_products_to_staging.py"
+REVIEWS_SCRIPT_S3_URI = f"s3://{S3_BUCKET}/jobs/transform_raw_reviews_to_staging.py"
+PY_FILES_S3_URI = f"s3://{S3_BUCKET}/jobs/src_package.zip"
 EMR_LOGS_S3_URI = f"s3://{S3_BUCKET}/logs/emr-serverless/"
 
 
-# =========================
-# Airflow wrappers for local GE validation
-# =========================
-
 def run_validate_products_task(**context):
-    """
-    Run Great Expectations validation for staging products
-    after the EMR Serverless transformation job completes.
-    """
     ingest_dt = context["ds"]
     run_staging_products_validation(ingest_dt=ingest_dt)
 
 
 def run_validate_reviews_task(**context):
-    """
-    Run Great Expectations validation for staging reviews
-    after the EMR Serverless transformation job completes.
-    """
     ingest_dt = context["ds"]
     run_staging_reviews_validation(ingest_dt=ingest_dt)
 
 
-# =========================
-# DAG definition
-# =========================
+COMMON_CONFIGURATION_OVERRIDES = {
+    "monitoringConfiguration": {
+        "s3MonitoringConfiguration": {
+            "logUri": EMR_LOGS_S3_URI,
+        }
+    },
+    "applicationConfiguration": [
+    {
+        "classification": "spark-defaults",
+        "properties": {
+            "spark.submit.pyFiles": PY_FILES_S3_URI,
+        },
+    },
+    {
+        "classification": "spark-env",
+        "configurations": [
+            {
+                "classification": "export",
+                "properties": {
+                    "AWS_REGION": "eu-central-1",
+                    "S3_BUCKET": S3_BUCKET,
+                    "S3_RAW_PREFIX": "raw/",
+                    "S3_STAGING_PREFIX": "staging/",
+                    "S3_MLREADY_PREFIX": "mlready/",
+                },
+            }
+        ],
+    },
+]
 
 with DAG(
     dag_id="recommender_system_pipeline_prod",
@@ -88,22 +93,18 @@ with DAG(
     tags=["project3", "recommender", "pipeline", "prod", "emr-serverless"],
 ) as dag:
 
-    # Dummy start task used to keep the DAG visually clear
     start = EmptyOperator(task_id="start")
 
-    # Ingest products from PostgreSQL to S3 Raw
     ingest_products = PythonOperator(
         task_id="ingest_products_to_s3_raw",
         python_callable=ingest_products_main,
     )
 
-    # Ingest reviews from MongoDB to S3 Raw
     ingest_reviews = PythonOperator(
         task_id="ingest_reviews_to_s3_raw",
         python_callable=ingest_reviews_main,
     )
 
-    # Submit Spark job for products transformation on EMR Serverless
     transform_products = EmrServerlessStartJobOperator(
         task_id="transform_raw_products_to_staging",
         application_id=EMR_SERVERLESS_APPLICATION_ID,
@@ -116,18 +117,12 @@ with DAG(
                 "entryPointArguments": [
                     build_manifest_key(entity="products", ingest_dt="{{ ds }}"),
                 ],
+                "sparkSubmitParameters": f"--py-files {PY_FILES_S3_URI}",
             }
         },
-        configuration_overrides={
-            "monitoringConfiguration": {
-                "s3MonitoringConfiguration": {
-                    "logUri": EMR_LOGS_S3_URI,
-                }
-            }
-        },
+        configuration_overrides=COMMON_CONFIGURATION_OVERRIDES,
     )
 
-    # Wait for products EMR Serverless job completion
     wait_for_products_transform = EmrServerlessJobSensor(
         task_id="wait_for_transform_raw_products_to_staging",
         application_id=EMR_SERVERLESS_APPLICATION_ID,
@@ -135,7 +130,6 @@ with DAG(
         aws_conn_id=AWS_CONN_ID,
     )
 
-    # Submit Spark job for reviews transformation on EMR Serverless
     transform_reviews = EmrServerlessStartJobOperator(
         task_id="transform_raw_reviews_to_staging",
         application_id=EMR_SERVERLESS_APPLICATION_ID,
@@ -148,18 +142,12 @@ with DAG(
                 "entryPointArguments": [
                     build_manifest_key(entity="reviews", ingest_dt="{{ ds }}"),
                 ],
+                "sparkSubmitParameters": f"--py-files {PY_FILES_S3_URI}",
             }
         },
-        configuration_overrides={
-            "monitoringConfiguration": {
-                "s3MonitoringConfiguration": {
-                    "logUri": EMR_LOGS_S3_URI,
-                }
-            }
-        },
+        configuration_overrides=COMMON_CONFIGURATION_OVERRIDES,
     )
 
-    # Wait for reviews EMR Serverless job completion
     wait_for_reviews_transform = EmrServerlessJobSensor(
         task_id="wait_for_transform_raw_reviews_to_staging",
         application_id=EMR_SERVERLESS_APPLICATION_ID,
@@ -167,19 +155,16 @@ with DAG(
         aws_conn_id=AWS_CONN_ID,
     )
 
-    # Validate staging products locally with Great Expectations
     validate_products = PythonOperator(
         task_id="validate_staging_products",
         python_callable=run_validate_products_task,
     )
 
-    # Validate staging reviews locally with Great Expectations
     validate_reviews = PythonOperator(
         task_id="validate_staging_reviews",
         python_callable=run_validate_reviews_task,
     )
 
-    # Dummy end task
     end = EmptyOperator(task_id="end")
 
     start >> [ingest_products, ingest_reviews]

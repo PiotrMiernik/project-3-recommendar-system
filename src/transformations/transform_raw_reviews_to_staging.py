@@ -3,7 +3,7 @@ from pyspark.sql import DataFrame, SparkSession, Window
 from pyspark.sql import functions as F
 from pyspark.sql import types as T
 
-from src.common.config import load_settings
+from src.common.config import load_emr_transform_settings
 from src.common.logging import get_logger
 from src.common.s3_utils import read_json_from_s3
 
@@ -282,7 +282,7 @@ def write_output(df: DataFrame, settings: dict) -> None:
     partitioned by ingest_dt.
     """
     bucket = settings["s3_bucket"]
-    prefix = settings["s3_silver_prefix"]  # kept as-is to match current config.py
+    prefix = settings["s3_staging_prefix"]  # kept as-is to match current config.py
 
     output_path = f"s3://{bucket}/{prefix}{ENTITY}"
     logger.info(f"Writing output to: {output_path}")
@@ -302,7 +302,7 @@ def run_reviews_transformation(manifest_key: str) -> None:
     Runs the full raw -> staging transformation for reviews
     based on a specific ingestion manifest.
     """
-    settings = load_settings()
+    settings = load_emr_transform_settings()
     spark = create_spark()
 
     try:
