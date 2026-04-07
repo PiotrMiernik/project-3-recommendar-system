@@ -63,23 +63,18 @@ COMMON_CONFIGURATION_OVERRIDES = {
             "classification": "spark-defaults",
             "properties": {
                 "spark.submit.pyFiles": PY_FILES_S3_URI,
+                "spark.emr-serverless.driverEnv.AWS_REGION": "eu-central-1",
+                "spark.emr-serverless.driverEnv.S3_BUCKET": S3_BUCKET,
+                "spark.emr-serverless.driverEnv.S3_RAW_PREFIX": "raw/",
+                "spark.emr-serverless.driverEnv.S3_STAGING_PREFIX": "staging/",
+                "spark.emr-serverless.driverEnv.S3_MLREADY_PREFIX": "mlready/",
+                "spark.executorEnv.AWS_REGION": "eu-central-1",
+                "spark.executorEnv.S3_BUCKET": S3_BUCKET,
+                "spark.executorEnv.S3_RAW_PREFIX": "raw/",
+                "spark.executorEnv.S3_STAGING_PREFIX": "staging/",
+                "spark.executorEnv.S3_MLREADY_PREFIX": "mlready/",
             },
-        },
-        {
-            "classification": "spark-env",
-            "configurations": [
-                {
-                    "classification": "export",
-                    "properties": {
-                        "AWS_REGION": "eu-central-1",
-                        "S3_BUCKET": S3_BUCKET,
-                        "S3_RAW_PREFIX": "raw/",
-                        "S3_STAGING_PREFIX": "staging/",
-                        "S3_MLREADY_PREFIX": "mlready/",
-                    },
-                }
-            ],
-        },
+        }
     ],
 }
 
