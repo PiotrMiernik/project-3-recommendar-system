@@ -27,9 +27,9 @@ resource "aws_emrserverless_application" "spark" {
 
   # Conservative resource limits for initial runs
   maximum_capacity {
-    cpu    = "4 vCPU"
-    memory = "16 GB"
-    disk   = "20 GB"
+    cpu    = "20 vCPU"
+    memory = "80 GB"
+    disk   = "200 GB"
   }
 
   # Enable S3 logging for job debugging

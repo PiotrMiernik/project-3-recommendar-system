@@ -114,11 +114,6 @@ with DAG(
                 ],
                 "sparkSubmitParameters": (
                     f"--py-files {PY_FILES_S3_URI} "
-                    "--conf spark.driver.cores=1 "
-                    "--conf spark.driver.memory=2g "
-                    "--conf spark.executor.cores=1 "
-                    "--conf spark.executor.memory=2g "
-                    "--conf spark.executor.instances=1"
                 ),
             }
         },
@@ -146,11 +141,6 @@ with DAG(
                 ],
                 "sparkSubmitParameters": (
                     f"--py-files {PY_FILES_S3_URI} "
-                    "--conf spark.driver.cores=1 "
-                    "--conf spark.driver.memory=2g "
-                    "--conf spark.executor.cores=1 "
-                    "--conf spark.executor.memory=2g "
-                    "--conf spark.executor.instances=1"
                 ),
             }
         },
