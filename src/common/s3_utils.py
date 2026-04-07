@@ -4,31 +4,38 @@
 import gzip
 import json
 from io import BytesIO
+from typing import Optional
 
 import boto3
 from botocore.exceptions import ClientError
 
+
 # Creates and returns a boto3 S3 client, optionally for a specific region.
-def get_s3_client(region: str | None = None):
+def get_s3_client(region: Optional[str] = None):
     if region:
         return boto3.client("s3", region_name=region)
     return boto3.client("s3")
+
 
 # Builds the base S3 prefix for raw data for a given entity and ingestion date.
 def build_raw_prefix(entity: str, ingest_dt: str) -> str:
     return f"raw/{entity}/ingest_dt={ingest_dt}/"
 
+
 # Builds the S3 key for a single data chunk (part file).
 def build_part_key(entity: str, ingest_dt: str, part_number: int) -> str:
     return f"{build_raw_prefix(entity, ingest_dt)}part-{part_number:05d}.jsonl.gz"
+
 
 # Builds the S3 key for the manifest file corresponding to a given ingestion run.
 def build_manifest_key(entity: str, ingest_dt: str) -> str:
     return f"{build_raw_prefix(entity, ingest_dt)}_manifest.json"
 
+
 # Builds the S3 key for storing pipeline state (e.g., watermark) for a given entity.
 def build_state_key(entity: str) -> str:
     return f"raw/_state/{entity}.json"
+
 
 # Converts (serializes) a list of records into JSON Lines format, compresses it with gzip,
 # and uploads the result to S3.
@@ -36,7 +43,7 @@ def upload_jsonl_gz_to_s3(
     bucket: str,
     key: str,
     records: list[dict],
-    region: str | None = None,
+    region: Optional[str] = None,
 ) -> None:
     buffer = BytesIO()
 
@@ -56,12 +63,13 @@ def upload_jsonl_gz_to_s3(
         ContentEncoding="gzip",
     )
 
+
 # Serializes a dictionary to JSON and uploads it to S3 (used for manifest or state files).
 def upload_json_to_s3(
     bucket: str,
     key: str,
     payload: dict,
-    region: str | None = None,
+    region: Optional[str] = None,
 ) -> None:
     body = json.dumps(payload, ensure_ascii=False, indent=2, default=str).encode("utf-8")
 
@@ -73,13 +81,14 @@ def upload_json_to_s3(
         ContentType="application/json",
     )
 
+
 # Reads a JSON object from S3 and returns it as a dictionary.
 # Returns None if the object does not exist.
 def read_json_from_s3(
     bucket: str,
     key: str,
-    region: str | None = None,
-) -> dict | None:
+    region: Optional[str] = None,
+) -> Optional[dict]:
     s3_client = get_s3_client(region)
 
     try:
