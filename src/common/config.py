@@ -4,8 +4,6 @@
 import os
 from pathlib import Path
 
-from dotenv import load_dotenv
-
 # Retrieves a required environment variable.
 # Raises an error if the variable is missing or empty.
 def get_required_env(var_name: str) -> str:
@@ -17,6 +15,8 @@ def get_required_env(var_name: str) -> str:
 # Loads environment variables from config/.env and returns all settings
 # as a dictionary used across ingestion, Airflow, and future pipelines.
 def load_settings() -> dict:
+    from dotenv import load_dotenv
+
     project_root = Path(__file__).resolve().parents[2]
     env_path = project_root / "config" / ".env"
 
@@ -36,13 +36,12 @@ def load_settings() -> dict:
         "rds_dbname": get_required_env("RDS_DBNAME"),
         "rds_user": get_required_env("RDS_USER"),
         "rds_password": get_required_env("RDS_PASSWORD"),
-        "embedding_model_version": os.getenv(
-            "EMBEDDING_MODEL_VERSION", "all-MiniLM-L6-v2"
-        ),
+        "embedding_model_version": os.getenv("EMBEDDING_MODEL_VERSION", "all-MiniLM-L6-v2"),
         "chunk_size": int(os.getenv("CHUNK_SIZE", "5000")),
     }
 
     return settings
+
 
 def load_emr_transform_settings() -> dict:
     settings = {
