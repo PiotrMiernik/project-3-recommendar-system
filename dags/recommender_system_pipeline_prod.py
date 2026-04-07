@@ -112,7 +112,14 @@ with DAG(
                 "entryPointArguments": [
                     build_manifest_key(entity="products", ingest_dt="{{ ds }}"),
                 ],
-                "sparkSubmitParameters": f"--py-files {PY_FILES_S3_URI}",
+                "sparkSubmitParameters": (
+                    f"--py-files {PY_FILES_S3_URI} "
+                    "--conf spark.driver.cores=1 "
+                    "--conf spark.driver.memory=2g "
+                    "--conf spark.executor.cores=1 "
+                    "--conf spark.executor.memory=2g "
+                    "--conf spark.executor.instances=1"
+                ),
             }
         },
         configuration_overrides=COMMON_CONFIGURATION_OVERRIDES,
@@ -137,7 +144,14 @@ with DAG(
                 "entryPointArguments": [
                     build_manifest_key(entity="reviews", ingest_dt="{{ ds }}"),
                 ],
-                "sparkSubmitParameters": f"--py-files {PY_FILES_S3_URI}",
+                "sparkSubmitParameters": (
+                    f"--py-files {PY_FILES_S3_URI} "
+                    "--conf spark.driver.cores=1 "
+                    "--conf spark.driver.memory=2g "
+                    "--conf spark.executor.cores=1 "
+                    "--conf spark.executor.memory=2g "
+                    "--conf spark.executor.instances=1"
+                ),
             }
         },
         configuration_overrides=COMMON_CONFIGURATION_OVERRIDES,
