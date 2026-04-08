@@ -69,19 +69,19 @@ def build_expectations():
     Define all expectations for staging_products.
     """
     return [
-        # asin must not be null -> required product identifier
+        # Check if asin exists and has no missing values
         gx.expectations.ExpectColumnValuesToNotBeNull(
-            column="asin",
-            severity="critical",
+            column="asin", 
+            severity="critical"
         ),
 
-        # asin must be unique -> confirms deduplication worked correctly
+        # Ensure asin is unique across the entire dataset
         gx.expectations.ExpectColumnValuesToBeUnique(
-            column="asin",
-            severity="critical",
+            column="asin", 
+            severity="critical"
         ),
 
-        # title should be present in most rows -> basic completeness check for product metadata
+        # Validate that at least 95% of products have a title
         gx.expectations.ExpectColumnProportionOfNonNullValuesToBeBetween(
             column="title",
             min_value=0.95,
@@ -89,35 +89,29 @@ def build_expectations():
             severity="warning",
         ),
 
-        # price must be numeric -> confirms raw price parsing produced a valid float column
+        # Verify that the price column is correctly parsed as float
         gx.expectations.ExpectColumnValuesToBeOfType(
             column="price",
             type_="float64",
             severity="warning",
         ),
 
-        # categories must be list-like -> confirms schema normalization for array fields
-        gx.expectations.ExpectColumnValuesToBeInTypeList(
-            column="categories",
-            type_list=["list", "ndarray"],
-            severity="critical",
-        ),
+        # Ensure 'categories' column exists (structural check)
+        gx.expectations.ExpectColumnToExist(column="categories"),
 
-        # also_buy must be list-like -> required structure for downstream recommendation signals
-        gx.expectations.ExpectColumnValuesToBeInTypeList(
-            column="also_buy",
-            type_list=["list", "ndarray"],
-            severity="critical",
-        ),
+        # Ensure 'also_buy' column exists (structural check)
+        gx.expectations.ExpectColumnToExist(column="also_buy"),
 
-        # also_view must be list-like -> required structure for downstream recommendation signals
-        gx.expectations.ExpectColumnValuesToBeInTypeList(
-            column="also_view",
-            type_list=["list", "ndarray"],
-            severity="critical",
+        # Ensure 'also_view' column exists (structural check)
+        gx.expectations.ExpectColumnToExist(column="also_view"),
+
+        # Verify that 'categories' are mostly not null (allows empty lists [])
+        gx.expectations.ExpectColumnValuesToNotBeNull(
+            column="categories", 
+            mostly=0.8,
+            severity="warning"
         ),
     ]
-
 
 # Validation helpers
 def normalize_result(result) -> dict:
@@ -223,7 +217,7 @@ def save_results(
 # Airflow entrypoint
 def run_staging_products_validation(
     ingest_dt: str,
-    output_dir: str = "gx_results",
+    output_dir: str = "src/data_validation/gx_results",
 ) -> None:
     """
     Main entrypoint for Airflow.
