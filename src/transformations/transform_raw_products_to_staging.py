@@ -1,6 +1,7 @@
 from pyspark import StorageLevel
 from pyspark.sql import DataFrame, SparkSession, Window
 from pyspark.sql import functions as F
+from pyspark.sql.types import ArrayType, StringType
 
 from src.common.config import load_emr_transform_settings
 from src.common.logging import get_logger
@@ -32,7 +33,6 @@ FINAL_COLUMNS = [
 ]
 
 
-# Spark session
 def create_spark() -> SparkSession:
     """
     Create and return a Spark session for the transformation job.
@@ -45,11 +45,9 @@ def create_spark() -> SparkSession:
     )
 
 
-# Manifest handling
 def load_manifest(settings: dict, manifest_key: str) -> dict:
     """
     Load ingestion manifest from S3.
-    The manifest defines which raw files belong to the current ingestion run.
     """
     manifest = read_json_from_s3(
         bucket=settings["s3_bucket"],
@@ -88,28 +86,15 @@ def extract_ingest_dt(manifest: dict) -> str:
     return ingest_dt
 
 
-# Technical validation
 def validate_required_columns(df: DataFrame) -> None:
     """
     Validate that the raw dataset contains the full expected input contract.
-    This is a technical schema validation, not a business-quality check.
     """
     required = {
-        "asin",
-        "title",
-        "brand",
-        "main_cat",
-        "category",
-        "description",
-        "feature",
-        "rank",
-        "also_buy",
-        "also_view",
-        "similar_item",
-        "date_raw",
-        "price_raw",
-        "ingest_dt",
-        "updated_at",
+        "asin", "title", "brand", "main_cat", "category",
+        "description", "feature", "rank", "also_buy",
+        "also_view", "similar_item", "date_raw",
+        "price_raw", "ingest_dt", "updated_at",
     }
 
     missing = required - set(df.columns)
@@ -118,7 +103,6 @@ def validate_required_columns(df: DataFrame) -> None:
         raise ValueError(f"Missing required columns: {sorted(missing)}")
 
 
-# Column normalization helpers
 def normalize_string(col):
     """
     Trim string values and convert empty strings to null.
@@ -126,23 +110,9 @@ def normalize_string(col):
     return F.when(F.trim(col) == "", None).otherwise(F.trim(col))
 
 
-def ensure_array(col):
-    """
-    Ensure a column is represented as array<string>.
-    If the value is null, return an empty array.
-    If the value is scalar, wrap it into a single-element array.
-    """
-    return (
-        F.when(col.isNull(), F.array().cast("array<string>"))
-        .when(col.cast("array<string>").isNotNull(), col.cast("array<string>"))
-        .otherwise(F.array(col.cast("string")))
-    )
-
-
 def parse_price(col):
     """
     Extract numeric price from raw price string.
-    Invalid or non-numeric values are converted to null.
     """
     value = F.regexp_extract(col, r"(\d+(?:\.\d+)?)", 1)
     return F.when(value == "", None).otherwise(value.cast("double"))
@@ -160,29 +130,44 @@ def rename_columns(df: DataFrame) -> DataFrame:
     )
 
 
-# Core transformation
 def transform(df: DataFrame, ingest_dt: str) -> DataFrame:
     """
     Transform raw products data into staging schema.
-    Includes:
-    - column renaming
-    - type normalization
-    - technical validation after casting
-    - deduplication by asin
     """
     df = rename_columns(df)
 
-    # Normalize selected string columns
-    for col_name in ["asin", "title", "brand", "main_category", "similar_item", "date_raw"]:
+    # Normalize standard string columns
+    string_cols = ["asin", "title", "brand", "main_category", "similar_item", "date_raw"]
+    for col_name in string_cols:
         if col_name in df.columns:
             df = df.withColumn(col_name, normalize_string(F.col(col_name)))
 
-    # Normalize selected array-like columns
-    for col_name in ["categories", "description", "features", "rank_raw", "also_buy", "also_view"]:
+    # Normalize array-like columns
+    # This handles the DATATYPE_MISMATCH error by checking the actual schema type
+    array_cols = ["categories", "description", "features", "rank_raw", "also_buy", "also_view"]
+    
+    # Get current schema to check types
+    current_dtypes = dict(df.dtypes)
+    
+    for col_name in array_cols:
         if col_name in df.columns:
-            df = df.withColumn(col_name, ensure_array(F.col(col_name)))
+            dtype = current_dtypes[col_name]
+            
+            # If the column is a String (common for 'rank_raw' from Postgres), wrap it in an array
+            if not dtype.startswith("array"):
+                df = df.withColumn(col_name, F.array(F.col(col_name).cast("string")))
+            else:
+                # If it's already an array, ensure the elements are strings
+                df = df.withColumn(col_name, F.col(col_name).cast("array<string>"))
+            
+            # Handle nulls by converting them to empty arrays
+            df = df.withColumn(
+                col_name, 
+                F.when(F.col(col_name).isNull(), F.array().cast("array<string>"))
+                .otherwise(F.col(col_name))
+            )
 
-    # Cast and enrich technical metadata
+    # Cast technical metadata and enrich
     df = (
         df.withColumn("price", parse_price(F.col("price_raw")))
         .withColumn("updated_at", F.to_timestamp("updated_at"))
@@ -190,44 +175,32 @@ def transform(df: DataFrame, ingest_dt: str) -> DataFrame:
         .withColumn("source_system", F.lit(SOURCE_SYSTEM))
     )
 
-    # Validate critical fields after transformation
-    invalid_asin_count = df.filter(F.col("asin").isNull()).count()
-    if invalid_asin_count > 0:
-        raise ValueError(f"Found {invalid_asin_count} records with null asin after normalization.")
+    # Technical validation for critical fields
+    if df.filter(F.col("asin").isNull()).count() > 0:
+        raise ValueError("Found records with null asin after transformation.")
 
-    invalid_updated_at_count = df.filter(F.col("updated_at").isNull()).count()
-    if invalid_updated_at_count > 0:
-        raise ValueError(
-            f"Found {invalid_updated_at_count} records with null updated_at after parsing."
-        )
+    if df.filter(F.col("updated_at").isNull()).count() > 0:
+        raise ValueError("Found records with null updated_at after parsing.")
 
-    invalid_ingest_dt_count = df.filter(F.col("ingest_dt").isNull()).count()
-    if invalid_ingest_dt_count > 0:
-        raise ValueError("ingest_dt could not be parsed.")
-
-    # Keep only the latest version of each product
-    window = Window.partitionBy("asin").orderBy(F.col("updated_at").desc_nulls_last())
+    # Deduplication: Keep only the latest version per product (asin)
+    window_spec = Window.partitionBy("asin").orderBy(F.col("updated_at").desc_nulls_last())
 
     df = (
-        df.withColumn("rn", F.row_number().over(window))
+        df.withColumn("rn", F.row_number().over(window_spec))
         .filter(F.col("rn") == 1)
         .drop("rn", "price_raw")
     )
 
-    # Enforce final staging schema and column order
-    df = df.select(*FINAL_COLUMNS)
-
-    return df
+    # Select final columns in correct order
+    return df.select(*FINAL_COLUMNS)
 
 
-# Output writing
 def write_output(df: DataFrame, settings: dict) -> None:
     """
-    Write transformed data to S3 staging as Parquet,
-    partitioned by ingest_dt.
+    Write transformed data to S3 staging in Parquet format, partitioned by date.
     """
     bucket = settings["s3_bucket"]
-    prefix = settings["s3_staging_prefix"]  # kept as-is to match current config.py
+    prefix = settings["s3_staging_prefix"]
 
     output_path = f"s3://{bucket}/{prefix}{ENTITY}"
     logger.info(f"Writing output to: {output_path}")
@@ -240,70 +213,49 @@ def write_output(df: DataFrame, settings: dict) -> None:
     )
 
 
-# Airflow entrypoint
 def run_products_transformation(manifest_key: str) -> None:
     """
-    Main entrypoint for Airflow.
-    Runs the full raw -> staging transformation for products
-    based on a specific ingestion manifest.
+    Main transformation workflow entry point.
     """
     settings = load_emr_transform_settings()
     spark = create_spark()
 
     try:
-        logger.info("Starting raw -> staging transformation for products")
-        logger.info(f"Manifest key: {manifest_key}")
-
+        logger.info(f"Starting products transformation. Manifest: {manifest_key}")
+        
         manifest = load_manifest(settings, manifest_key)
         input_paths = extract_input_paths(settings, manifest)
         ingest_dt = extract_ingest_dt(manifest)
 
-        logger.info(f"Resolved ingest_dt: {ingest_dt}")
-        logger.info(f"Input files count: {len(input_paths)}")
-
+        # Read raw JSON data
         raw_df = spark.read.json(input_paths)
-
         validate_required_columns(raw_df)
 
-        input_count = raw_df.count()
-        if input_count == 0:
-            raise ValueError("Input DataFrame is empty.")
+        if raw_df.isEmpty():
+            raise ValueError("Input data is empty.")
 
-        logger.info(f"Input records count: {input_count}")
-
-        # Persist the transformed DataFrame because it is reused for count() and write()
+        # Execute transformation and persist result for multiple actions
         staging_df = transform(raw_df, ingest_dt).persist(StorageLevel.MEMORY_AND_DISK)
 
         output_count = staging_df.count()
-        if output_count == 0:
-            raise ValueError("Output DataFrame is empty after transformation.")
-
-        logger.info(f"Output records count: {output_count}")
+        logger.info(f"Successfully transformed {output_count} records.")
 
         write_output(staging_df, settings)
-
-        logger.info("Products transformation finished successfully.")
+        logger.info("Products transformation task completed.")
 
     except Exception as exc:
-        logger.exception(f"Products transformation failed: {exc}")
+        logger.exception(f"Critical error during transformation: {exc}")
         raise
     finally:
-        try:
-            if "staging_df" in locals():
-                staging_df.unpersist()
-        finally:
-            spark.stop()
+        if "staging_df" in locals():
+            staging_df.unpersist()
+        spark.stop()
 
 
-# Script entrypoint for EMR Serverless
 if __name__ == "__main__":
     import sys
-
     if len(sys.argv) != 2:
-        raise ValueError(
-            "Expected exactly one argument: manifest_key. "
-            "Usage: spark-submit transform_raw_products_to_staging.py <manifest_key>"
-        )
+        print("Usage: spark-submit transform_raw_products_to_staging.py <manifest_key>")
+        sys.exit(1)
 
-    manifest_key = sys.argv[1]
-    run_products_transformation(manifest_key=manifest_key)
+    run_products_transformation(manifest_key=sys.argv[1])

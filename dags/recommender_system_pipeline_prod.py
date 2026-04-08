@@ -166,9 +166,9 @@ with DAG(
 
     end = EmptyOperator(task_id="end")
 
+    # Dependencies - start with parallel ingestion, then sequentional transformation and validatiod flow (products first, then reviews)
+
     start >> [ingest_products, ingest_reviews]
 
-    ingest_products >> transform_products >> wait_for_products_transform >> validate_products
-    ingest_reviews >> transform_reviews >> wait_for_reviews_transform >> validate_reviews
-
-    [validate_products, validate_reviews] >> end
+    ingest_products >> transform_products >> wait_for_products_transform >> validate_products \
+    >> transform_reviews >> wait_for_reviews_transform >> validate_reviews >> end

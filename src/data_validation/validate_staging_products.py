@@ -21,7 +21,7 @@ def build_partition_path(settings: dict, ingest_dt: str) -> str:
     s3://bucket/staging/products/ingest_dt=YYYY-MM-DD/
     """
     bucket = settings["s3_bucket"]
-    prefix = settings["s3_silver_prefix"]  # kept as-is to match current config.py
+    prefix = settings["s3_staging_prefix"]
     return f"s3://{bucket}/{prefix}{ENTITY}/ingest_dt={ingest_dt}/"
 
 
