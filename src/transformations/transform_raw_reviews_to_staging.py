@@ -38,6 +38,7 @@ def create_spark() -> SparkSession:
         SparkSession.builder.appName("transform-reviews-raw-to-staging")
         .config("spark.sql.sources.partitionOverwriteMode", "dynamic")
         .config("spark.sql.session.timeZone", "UTC")
+        .config("spark.sql.legacy.timeParserPolicy", "LEGACY")
         .getOrCreate()
     )
 
@@ -113,11 +114,20 @@ def parse_vote(col: F.Column) -> F.Column:
 def normalize_style(col: F.Column) -> F.Column:
     """
     Ensure the style column is represented as map<string, string>.
+    Handles the conversion from STRUCT (inferred from JSON) to MAP.
     """
-    # Defensive casting to ensure downstream compatibility
+    # 1. Convert Struct to JSON string
+    # 2. Parse JSON string back to Map<String, String>
+    # 3. Handle nulls by returning an empty map
+    
+    map_type = T.MapType(T.StringType(), T.StringType())
+    
+    json_style = F.to_json(col)
+    parsed_map = F.from_json(json_style, map_type)
+    
     return (
-        F.when(col.isNull(), F.create_map().cast(T.MapType(T.StringType(), T.StringType())))
-        .otherwise(col.cast(T.MapType(T.StringType(), T.StringType())))
+        F.when(col.isNull() | json_style.isNull(), F.create_map().cast(map_type))
+        .otherwise(parsed_map)
     )
 
 def build_review_id() -> F.Column:
@@ -172,7 +182,7 @@ def transform(df: DataFrame, ingest_dt: str) -> DataFrame:
             "vote_count",
             parse_vote(F.col("vote")) if "vote" in df.columns else F.lit(None).cast("int"),
         )
-        .withColumn("review_time", F.to_date(F.col("review_time_raw"), "MM dd, yyyy"))
+        .withColumn("review_time", F.to_date(F.col("review_time_raw"), "MM d, yyyy"))
         .withColumn(
             "review_timestamp",
             F.to_timestamp(F.from_unixtime(F.col("unix_review_time").cast("long")))
