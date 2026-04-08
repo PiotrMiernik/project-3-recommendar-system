@@ -214,7 +214,7 @@ def save_results(
 # Airflow entrypoint
 def run_staging_reviews_validation(
     ingest_dt: str,
-    output_dir: str = "gx_results",
+    output_dir: str = "src/data_validation/gx_results",
 ) -> None:
     """
     Main entrypoint for Airflow.
