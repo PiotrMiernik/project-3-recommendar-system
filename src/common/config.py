@@ -4,16 +4,12 @@
 import os
 from pathlib import Path
 
-# Retrieves a required environment variable.
-# Raises an error if the variable is missing or empty.
 def get_required_env(var_name: str) -> str:
     value = os.getenv(var_name)
     if value is None or value.strip() == "":
         raise ValueError(f"Missing required environment variable: {var_name}")
     return value
 
-# Loads environment variables from config/.env and returns all settings
-# as a dictionary used across ingestion, Airflow, and future pipelines.
 def load_settings() -> dict:
     from dotenv import load_dotenv
 
@@ -39,17 +35,29 @@ def load_settings() -> dict:
         "embedding_model_version": os.getenv("EMBEDDING_MODEL_VERSION", "all-MiniLM-L6-v2"),
         "chunk_size": int(os.getenv("CHUNK_SIZE", "5000")),
     }
-
     return settings
 
-
 def load_emr_transform_settings() -> dict:
-    settings = {
-        "aws_region": get_required_env("AWS_REGION"),
-        "s3_bucket": get_required_env("S3_BUCKET"),
+    return {
+        "aws_region": os.getenv("AWS_REGION"),
+        "s3_bucket": os.getenv("S3_BUCKET"),
         "s3_raw_prefix": os.getenv("S3_RAW_PREFIX", "raw/"),
         "s3_staging_prefix": os.getenv("S3_STAGING_PREFIX", "staging/"),
         "s3_mlready_prefix": os.getenv("S3_MLREADY_PREFIX", "mlready/"),
     }
 
-    return settings
+def get_iceberg_settings() -> dict:
+    """
+    Centralized naming and identification for Iceberg tables in the Gold layer.
+    """
+    catalog = "glue_catalog"
+    db = "mlready"
+    
+    return {
+        "catalog_name": catalog,
+        "database_name": db,
+        "table_products": f"{catalog}.{db}.product_features",
+        "table_users": f"{catalog}.{db}.user_features",
+        "table_interactions": f"{catalog}.{db}.user_product_interactions",
+        "table_stats": f"{catalog}.{db}.global_stats"
+    } 
