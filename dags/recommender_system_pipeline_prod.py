@@ -42,6 +42,10 @@ REVIEWS_SCRIPT_S3_URI = f"s3://{S3_BUCKET}/jobs/transform_raw_reviews_to_staging
 PY_FILES_S3_URI = f"s3://{S3_BUCKET}/jobs/src_package.zip"
 EMR_LOGS_S3_URI = f"s3://{S3_BUCKET}/logs/emr-serverless/"
 
+MLREADY_PRODUCTS_SCRIPT = f"s3://{S3_BUCKET}/jobs/build_mlready_product_features.py"
+MLREADY_USERS_SCRIPT = f"s3://{S3_BUCKET}/jobs/build_mlready_user_features.py"
+MLREADY_STATS_SCRIPT = f"s3://{S3_BUCKET}/jobs/build_mlready_product_review_stats.py"
+MLREADY_INTERACTIONS_SCRIPT = f"s3://{S3_BUCKET}/jobs/build_mlready_user_product_interactions.py"
 
 def run_validate_products_task(**context):
     ingest_dt = context["ds"]
@@ -164,11 +168,104 @@ with DAG(
         python_callable=run_validate_reviews_task,
     )
 
+    # 1. Product Features
+    build_gold_products = EmrServerlessStartJobOperator(
+        task_id="build_mlready_product_features",
+        application_id=EMR_SERVERLESS_APPLICATION_ID,
+        execution_role_arn=EMR_SERVERLESS_EXECUTION_ROLE_ARN,
+        job_driver={
+            "sparkSubmit": {
+                "entryPoint": MLREADY_PRODUCTS_SCRIPT,
+                "entryPointArguments": [
+                    "--input-path", f"s3://{S3_BUCKET}/staging/products/ingest_dt={{{{ ds }}}}/",
+                    "--execution-date", "{{ ds }}"
+                ],
+                "sparkSubmitParameters": f"--py-files {PY_FILES_S3_URI}"
+            }
+        },
+        configuration_overrides=COMMON_CONFIGURATION_OVERRIDES,
+    )
+
+    # 2. User Features
+    build_gold_users = EmrServerlessStartJobOperator(
+        task_id="build_mlready_user_features",
+        application_id=EMR_SERVERLESS_APPLICATION_ID,
+        execution_role_arn=EMR_SERVERLESS_EXECUTION_ROLE_ARN,
+        job_driver={
+            "sparkSubmit": {
+                "entryPoint": MLREADY_USERS_SCRIPT,
+                "entryPointArguments": [
+                    "--input-path", f"s3://{S3_BUCKET}/staging/reviews/ingest_dt={{{{ ds }}}}/",
+                    "--execution-date", "{{ ds }}"
+                ],
+                "sparkSubmitParameters": f"--py-files {PY_FILES_S3_URI}"
+            }
+        },
+        configuration_overrides=COMMON_CONFIGURATION_OVERRIDES,
+    )
+
+    # 3. Product Review Stats
+    build_gold_stats = EmrServerlessStartJobOperator(
+        task_id="build_mlready_product_review_stats",
+        application_id=EMR_SERVERLESS_APPLICATION_ID,
+        execution_role_arn=EMR_SERVERLESS_EXECUTION_ROLE_ARN,
+        job_driver={
+            "sparkSubmit": {
+                "entryPoint": MLREADY_STATS_SCRIPT,
+                "entryPointArguments": [
+                    "--input-path", f"s3://{S3_BUCKET}/staging/reviews/ingest_dt={{{{ ds }}}}/",
+                    "--execution-date", "{{ ds }}"
+                ],
+                "sparkSubmitParameters": f"--py-files {PY_FILES_S3_URI}"
+            }
+        },
+        configuration_overrides=COMMON_CONFIGURATION_OVERRIDES,
+    )
+
+    # 4. Master Interactions Table (The Big Join)
+    build_gold_interactions = EmrServerlessStartJobOperator(
+        task_id="build_mlready_user_product_interactions",
+        application_id=EMR_SERVERLESS_APPLICATION_ID,
+        execution_role_arn=EMR_SERVERLESS_EXECUTION_ROLE_ARN,
+        job_driver={
+            "sparkSubmit": {
+                "entryPoint": MLREADY_INTERACTIONS_SCRIPT,
+                "entryPointArguments": [
+                    "--execution-date", "{{ ds }}"
+                ],
+                "sparkSubmitParameters": f"--py-files {PY_FILES_S3_URI}"
+            }
+        },
+        configuration_overrides=COMMON_CONFIGURATION_OVERRIDES,
+    )
+
     end = EmptyOperator(task_id="end")
 
-    # Dependencies - start with parallel ingestion, then sequentional transformation and validatiod flow (products first, then reviews)
-
+# --- FULLY SEQUENTIAL DATA PIPELINE DEPENDENCIES ---
+    
+    # PHASE 1: Data Ingestion
+    # Ingestion runs in parallel as these are standard Python tasks, 
+    # not consuming EMR Serverless capacity.
     start >> [ingest_products, ingest_reviews]
 
-    ingest_products >> transform_products >> wait_for_products_transform >> validate_products \
-    >> transform_reviews >> wait_for_reviews_transform >> validate_reviews >> end
+    # PHASE 2: Staging Layer (Sequential EMR Execution)
+    # We process products first to avoid resource contention on EMR.
+    ingest_products >> transform_products >> wait_for_products_transform >> validate_products
+    
+    # Review transformation starts only after Product Staging is validated.
+    validate_products >> transform_reviews >> wait_for_reviews_transform >> validate_reviews
+
+    # PHASE 3: Gold Layer (Feature Engineering)
+    # We build smaller feature tables sequentially to stay within EMR resource limits.
+    # 3.1. Create Product Metadata features
+    validate_reviews >> build_gold_products
+    
+    # 3.2. Create User Behavioral profiles
+    build_gold_products >> build_gold_users
+    
+    # 3.3. Calculate Product Review statistics (Social Proof)
+    build_gold_users >> build_gold_stats
+    
+    # PHASE 4: Master Feature Table (The Final Join)
+    # Once all dimension tables are updated in Iceberg, trigger the final join.
+    build_gold_stats >> build_gold_interactions >> end
