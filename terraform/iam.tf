@@ -1,20 +1,11 @@
 # This configuration follows the Principle of Least Privilege (PoLP) and sets up:
 # 1. Orchestrator Role: Used by local Airflow to manage AWS resources.
-#    - Allows starting/monitoring EMR Serverless jobs.
-#    - Allows passing the Runtime Role to the EMR service.
-#    - Allows S3 access for Data Ingestion and Great Expectations validation.
-#
 # 2. EMR Serverless Runtime Role: Used by the Spark engine during execution.
-#    - Allows reading raw data and scripts from S3.
-#    - Allows writing transformed data to staging/mlready layers.
-#    - Allows writing Spark logs for monitoring.
 
 data "aws_caller_identity" "current" {}
 
-
 # 1. ORCHESTRATOR ROLE (For Local Airflow)
 
-# Trust Policy: Allows your IAM User/Local Process to assume this role
 data "aws_iam_policy_document" "orchestrator_assume" {
   statement {
     effect  = "Allow"
@@ -31,21 +22,20 @@ resource "aws_iam_role" "orchestrator_role" {
   assume_role_policy = data.aws_iam_policy_document.orchestrator_assume.json
 }
 
-# Policy: Permissions for Airflow to manage EMR and S3
 data "aws_iam_policy_document" "orchestrator_policy_doc" {
   # Manage EMR Serverless Jobs
   statement {
     sid    = "EMRServerlessManagement"
     effect = "Allow"
     actions = [
-    "emr-serverless:GetApplication",
-    "emr-serverless:ListApplications",
-    "emr-serverless:StartApplication",
-    "emr-serverless:StopApplication",
-    "emr-serverless:StartJobRun",
-    "emr-serverless:GetJobRun",
-    "emr-serverless:CancelJobRun",
-    "emr-serverless:ListJobRuns"
+      "emr-serverless:GetApplication",
+      "emr-serverless:ListApplications",
+      "emr-serverless:StartApplication",
+      "emr-serverless:StopApplication",
+      "emr-serverless:StartJobRun",
+      "emr-serverless:GetJobRun",
+      "emr-serverless:CancelJobRun",
+      "emr-serverless:ListJobRuns"
     ]
     resources = ["*"]
   }
@@ -90,10 +80,8 @@ resource "aws_iam_role_policy_attachment" "orchestrator_attach" {
   policy_arn = aws_iam_policy.orchestrator_policy.arn
 }
 
-
 # 2. EMR SERVERLESS RUNTIME ROLE (For Spark Execution)
 
-# Trust Policy: Allows EMR Serverless service to assume this role
 data "aws_iam_policy_document" "emr_serverless_runtime_assume" {
   statement {
     effect  = "Allow"
@@ -110,8 +98,8 @@ resource "aws_iam_role" "emr_serverless_runtime_role" {
   assume_role_policy = data.aws_iam_policy_document.emr_serverless_runtime_assume.json
 }
 
-# Policy: S3 Permissions for Spark Job
 data "aws_iam_policy_document" "s3_emr_serverless_runtime" {
+  # List Bucket for S3 connectivity
   statement {
     sid       = "ListBucket"
     effect    = "Allow"
@@ -119,18 +107,20 @@ data "aws_iam_policy_document" "s3_emr_serverless_runtime" {
     resources = ["arn:aws:s3:::${var.s3_bucket_name}"]
   }
 
-  # Read access for Raw Data AND Spark Scripts (jobs/)
+  # Read access for Raw, Staging AND Spark Scripts
   statement {
     sid       = "ReadInputAndScripts"
     effect    = "Allow"
     actions   = ["s3:GetObject", "s3:GetObjectTagging"]
     resources = [
-        "arn:aws:s3:::${var.s3_bucket_name}/raw/*",
-        "arn:aws:s3:::${var.s3_bucket_name}/jobs/*"
+      "arn:aws:s3:::${var.s3_bucket_name}/raw/*",
+      "arn:aws:s3:::${var.s3_bucket_name}/staging/*",
+      "arn:aws:s3:::${var.s3_bucket_name}/jobs/*"
     ]
   }
 
   # Write access for Staging, MLReady and Logs
+  # Note: GetObject is also needed for MLReady to handle Iceberg metadata operations
   statement {
     sid    = "WriteOutputAndLogs"
     effect = "Allow"
@@ -138,6 +128,7 @@ data "aws_iam_policy_document" "s3_emr_serverless_runtime" {
       "s3:PutObject",
       "s3:PutObjectTagging",
       "s3:DeleteObject",
+      "s3:GetObject",
       "s3:AbortMultipartUpload",
       "s3:ListMultipartUploadParts"
     ]
@@ -145,6 +136,30 @@ data "aws_iam_policy_document" "s3_emr_serverless_runtime" {
       "arn:aws:s3:::${var.s3_bucket_name}/staging/*",
       "arn:aws:s3:::${var.s3_bucket_name}/mlready/*",
       "arn:aws:s3:::${var.s3_bucket_name}/logs/*"
+    ]
+  }
+
+  # Glue Catalog Permissions for Apache Iceberg
+  statement {
+    sid    = "GlueCatalogAccess"
+    effect = "Allow"
+    actions = [
+      "glue:GetDatabase",
+      "glue:GetDatabases",
+      "glue:CreateDatabase",
+      "glue:GetTable",
+      "glue:GetTables",
+      "glue:CreateTable",
+      "glue:UpdateTable",
+      "glue:DeleteTable",
+      "glue:GetPartitions",
+      "glue:BatchCreatePartition",
+      "glue:BatchGetPartition"
+    ]
+    resources = [
+      "arn:aws:glue:${var.aws_region}:${data.aws_caller_identity.current.account_id}:catalog",
+      "arn:aws:glue:${var.aws_region}:${data.aws_caller_identity.current.account_id}:database/mlready",
+      "arn:aws:glue:${var.aws_region}:${data.aws_caller_identity.current.account_id}:table/mlready/*"
     ]
   }
 }
