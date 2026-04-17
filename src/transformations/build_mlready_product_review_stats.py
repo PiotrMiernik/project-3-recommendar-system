@@ -13,7 +13,6 @@ from pyspark.sql import types as T
 # Internal project imports
 from src.common.config import load_emr_transform_settings, get_iceberg_settings
 from src.common.logging import get_logger
-from src.common.spark_utils import column_exists
 
 logger = get_logger(__name__)
 iceberg_cfg = get_iceberg_settings()
@@ -25,6 +24,9 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 def create_spark_session(app_name: str) -> SparkSession:
+    """
+    Initializes Spark Session with Iceberg extensions for Glue Catalog.
+    """
     settings = load_emr_transform_settings()
     catalog_name = iceberg_cfg["catalog_name"]
     warehouse_path = f"s3://{settings['s3_bucket']}/{settings['s3_mlready_prefix']}"
@@ -43,23 +45,27 @@ def create_spark_session(app_name: str) -> SparkSession:
 def build_product_review_stats(df: DataFrame, execution_date: str) -> DataFrame:
     """
     Aggregates reviews by ASIN to compute statistical features.
+    Uses standardized column names from the Staging layer.
     """
-    # Logic for positive (4-5) and negative (1-2) reviews
-    is_positive_col = F.when(F.col("overall") >= 4, 1).otherwise(0)
-    is_negative_col = F.when(F.col("overall") <= 2, 1).otherwise(0)
+    # Logic for positive (4-5) and negative (1-2) reviews based on 'rating' column
+    is_positive_col = F.when(F.col("rating") >= 4, 1).otherwise(0)
+    is_negative_col = F.when(F.col("rating") <= 2, 1).otherwise(0)
 
     stats_df = df.groupBy("asin").agg(
         F.count("reviewer_id").alias("reviews_count"),
         F.countDistinct("reviewer_id").alias("distinct_reviewers_count"),
-        F.avg("overall").alias("avg_rating"),
-        F.stddev("overall").alias("rating_stddev"),
+        F.avg("rating").alias("avg_rating"),
+        F.stddev("rating").alias("rating_stddev"),
         F.avg(F.col("verified").cast("int")).alias("verified_reviews_ratio"),
-        F.avg(F.coalesce(F.col("vote").cast("double"), F.lit(0.0))).alias("avg_vote_count"),
-        F.avg(F.length(F.coalesce(F.col("reviewText"), F.lit("")))).alias("avg_review_text_length"),
+        # Use 'vote_count' from staging
+        F.avg(F.coalesce(F.col("vote_count").cast("double"), F.lit(0.0))).alias("avg_vote_count"),
+        # Use 'review_text' from staging
+        F.avg(F.length(F.coalesce(F.col("review_text"), F.lit("")))).alias("avg_review_text_length"),
         F.avg(is_positive_col).alias("positive_reviews_ratio"),
         F.avg(is_negative_col).alias("negative_reviews_ratio"),
-        F.min("unixReviewTime").alias("first_review_timestamp"),
-        F.max("unixReviewTime").alias("last_review_timestamp")
+        # Use 'review_timestamp' which is already a Timestamp object in staging
+        F.min("review_timestamp").alias("first_review_timestamp"),
+        F.max("review_timestamp").alias("last_review_timestamp")
     )
 
     # Final selection with explicit casting
@@ -78,8 +84,9 @@ def build_product_review_stats(df: DataFrame, execution_date: str) -> DataFrame:
             F.col("avg_review_text_length").cast("double"),
             F.col("positive_reviews_ratio").cast("double"),
             F.col("negative_reviews_ratio").cast("double"),
-            F.from_unixtime(F.col("first_review_timestamp")).cast("timestamp").alias("first_review_timestamp"),
-            F.from_unixtime(F.col("last_review_timestamp")).cast("timestamp").alias("last_review_timestamp"),
+            # No need for from_unixtime because staging already provided Timestamp objects
+            F.col("first_review_timestamp"),
+            F.col("last_review_timestamp"),
             "feature_snapshot_date"
         )
     )
@@ -89,22 +96,22 @@ def main():
     spark = create_spark_session("gold-product-review-stats")
     
     try:
-        logger.info(f"Aggregating product review stats for {args.execution_date}")
+        logger.info(f"Starting product review stats aggregation for {args.execution_date}")
         input_df = spark.read.parquet(args.input_path)
         
-        # Initial cleanup: deduplicate the same review from the same user on the same product
-        input_df = input_df.dropDuplicates(["reviewer_id", "asin", "unixReviewTime"])
+        # Deduplication using standardized names from staging
+        input_df = input_df.dropDuplicates(["reviewer_id", "asin", "review_timestamp"])
         
         final_df = build_product_review_stats(input_df, args.execution_date)
 
         target_table = iceberg_cfg["table_stats"]
-        logger.info(f"Writing to Iceberg: {target_table}")
+        logger.info(f"Writing results to Iceberg table: {target_table}")
         
         final_df.writeTo(target_table).using("iceberg").createOrReplace()
         
-        logger.info("Product review stats update completed.")
+        logger.info("Product review stats build finished successfully.")
     except Exception as e:
-        logger.error(f"Job failed: {e}")
+        logger.error(f"Job failed due to error: {e}")
         sys.exit(1)
     finally:
         spark.stop()

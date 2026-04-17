@@ -55,7 +55,7 @@ def build_product_features(df: DataFrame, execution_date: str) -> DataFrame:
         .withColumn("feature_snapshot_date", F.to_date(F.lit(execution_date)))
         .select(
             "asin", "title", "brand", "price", "has_brand", "has_price", 
-            "title_length", "description_total_length", "feature_snapshot_date"
+            "title_length", "description_total_length", "main_category", "feature_snapshot_date"
         )
     )
 
