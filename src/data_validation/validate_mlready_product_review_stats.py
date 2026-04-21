@@ -2,7 +2,6 @@ import json
 from pathlib import Path
 
 import great_expectations as gx
-from great_expectations.dataset import SparkDFDataset
 from pyspark.sql import SparkSession
 
 from src.common.config import load_emr_transform_settings, get_iceberg_settings
@@ -24,16 +23,30 @@ def create_spark_session(app_name: str) -> SparkSession:
     catalog_name = iceberg_cfg["catalog_name"]
     warehouse_path = f"s3://{settings['s3_bucket']}/{settings['s3_mlready_prefix']}"
 
+    iceberg_version = "1.10.1"
+
     return (
         SparkSession.builder
         .appName(app_name)
-        .config("spark.sql.extensions", "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions")
-        .config(f"spark.sql.catalog.{catalog_name}", "org.apache.iceberg.spark.SparkCatalog")
-        .config(f"spark.sql.catalog.{catalog_name}.catalog-impl", "org.apache.iceberg.aws.glue.GlueCatalog")
+        .config(
+            "spark.jars.packages",
+            ",".join([
+                f"org.apache.iceberg:iceberg-spark-runtime-4.0_2.13:{iceberg_version}",
+                f"org.apache.iceberg:iceberg-aws-bundle:{iceberg_version}",
+            ])
+        )
+        .config(
+            "spark.sql.extensions",
+            "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions",
+        )
+        .config(
+            f"spark.sql.catalog.{catalog_name}",
+            "org.apache.iceberg.spark.SparkCatalog",
+        )
+        .config(f"spark.sql.catalog.{catalog_name}.type", "glue")
         .config(f"spark.sql.catalog.{catalog_name}.warehouse", warehouse_path)
         .getOrCreate()
     )
-
 
 # Data loading
 def read_mlready_table(spark: SparkSession, table_name: str):
@@ -55,7 +68,17 @@ def build_batch(df):
     """
     Create a Great Expectations batch from a Spark DataFrame.
     """
-    return SparkDFDataset(df)
+    context = gx.get_context()
+
+    data_source = context.data_sources.add_spark(f"mlready_{ENTITY}_ds")
+    data_asset = data_source.add_dataframe_asset(name=f"mlready_{ENTITY}_asset")
+    batch_definition = data_asset.add_batch_definition_whole_dataframe(
+        f"mlready_{ENTITY}_batch"
+    )
+
+    batch = batch_definition.get_batch(batch_parameters={"dataframe": df})
+
+    return batch
 
 
 # Expectations

@@ -12,7 +12,6 @@ import json
 from pathlib import Path
 
 import great_expectations as gx
-from great_expectations.dataset import SparkDFDataset
 from pyspark.sql import SparkSession
 
 from src.common.config import load_emr_transform_settings, get_iceberg_settings
@@ -28,19 +27,40 @@ iceberg_cfg = get_iceberg_settings()
 # Spark / Iceberg setup
 def create_spark_session(app_name: str) -> SparkSession:
     """
-    Create a local Spark session with Iceberg + Glue catalog support.
+    Create a local Spark session with Iceberg runtime and Glue catalog support.
     """
     settings = load_emr_transform_settings()
     catalog_name = iceberg_cfg["catalog_name"]
     warehouse_path = f"s3://{settings['s3_bucket']}/{settings['s3_mlready_prefix']}"
 
+    iceberg_version = "1.10.1"
+    dependencies = (
+        f"org.apache.iceberg:iceberg-spark-runtime-4.0_2.13:{iceberg_version},"
+        f"org.apache.iceberg:iceberg-aws-bundle:{iceberg_version}"
+    )
+
     return (
         SparkSession.builder
         .appName(app_name)
-        .config("spark.sql.extensions", "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions")
-        .config(f"spark.sql.catalog.{catalog_name}", "org.apache.iceberg.spark.SparkCatalog")
-        .config(f"spark.sql.catalog.{catalog_name}.catalog-impl", "org.apache.iceberg.aws.glue.GlueCatalog")
+        .config("spark.jars.packages", dependencies)
+        .config(
+            "spark.sql.extensions",
+            "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions",
+        )
+        .config(
+            f"spark.sql.catalog.{catalog_name}",
+            "org.apache.iceberg.spark.SparkCatalog",
+        )
+        .config(
+            f"spark.sql.catalog.{catalog_name}.catalog-impl",
+            "org.apache.iceberg.aws.glue.GlueCatalog",
+        )
+        .config(
+            f"spark.sql.catalog.{catalog_name}.io-impl",
+            "org.apache.iceberg.aws.s3.S3FileIO",
+        )
         .config(f"spark.sql.catalog.{catalog_name}.warehouse", warehouse_path)
+        .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
         .getOrCreate()
     )
 
@@ -65,22 +85,31 @@ def build_batch(df):
     """
     Create a Great Expectations batch from a Spark DataFrame.
     """
-    return SparkDFDataset(df)
+    context = gx.get_context()
+
+    data_source = context.data_sources.add_spark(f"mlready_{ENTITY}_ds")
+    data_asset = data_source.add_dataframe_asset(name=f"mlready_{ENTITY}_asset")
+    batch_definition = data_asset.add_batch_definition_whole_dataframe(
+        f"mlready_{ENTITY}_batch"
+    )
+
+    batch = batch_definition.get_batch(batch_parameters={"dataframe": df})
+
+    return batch
 
 
 # Expectations
 def build_expectations():
     """
     Define all expectations for mlready.product_features.
+    Expectations are aligned with the current build_mlready_product_features output schema.
     """
     return [
-        # Check if asin exists and has no missing values
+        # Primary/business key checks
         gx.expectations.ExpectColumnValuesToNotBeNull(
             column="asin",
             severity="critical",
         ),
-
-        # Ensure asin is unique across the entire dataset
         gx.expectations.ExpectColumnValuesToBeUnique(
             column="asin",
             severity="critical",
@@ -93,14 +122,8 @@ def build_expectations():
         gx.expectations.ExpectColumnToExist(column="price"),
         gx.expectations.ExpectColumnToExist(column="has_brand"),
         gx.expectations.ExpectColumnToExist(column="has_price"),
-        gx.expectations.ExpectColumnToExist(column="has_description"),
         gx.expectations.ExpectColumnToExist(column="title_length"),
         gx.expectations.ExpectColumnToExist(column="description_total_length"),
-        gx.expectations.ExpectColumnToExist(column="features_count"),
-        gx.expectations.ExpectColumnToExist(column="categories_count"),
-        gx.expectations.ExpectColumnToExist(column="also_buy_count"),
-        gx.expectations.ExpectColumnToExist(column="also_view_count"),
-        gx.expectations.ExpectColumnToExist(column="updated_at"),
         gx.expectations.ExpectColumnToExist(column="feature_snapshot_date"),
 
         # Snapshot date must be present
@@ -117,26 +140,6 @@ def build_expectations():
         ),
         gx.expectations.ExpectColumnValuesToBeBetween(
             column="description_total_length",
-            min_value=0,
-            severity="critical",
-        ),
-        gx.expectations.ExpectColumnValuesToBeBetween(
-            column="features_count",
-            min_value=0,
-            severity="critical",
-        ),
-        gx.expectations.ExpectColumnValuesToBeBetween(
-            column="categories_count",
-            min_value=0,
-            severity="critical",
-        ),
-        gx.expectations.ExpectColumnValuesToBeBetween(
-            column="also_buy_count",
-            min_value=0,
-            severity="critical",
-        ),
-        gx.expectations.ExpectColumnValuesToBeBetween(
-            column="also_view_count",
             min_value=0,
             severity="critical",
         ),
@@ -157,11 +160,6 @@ def build_expectations():
         ),
         gx.expectations.ExpectColumnValuesToBeInSet(
             column="has_price",
-            value_set=[True, False],
-            severity="critical",
-        ),
-        gx.expectations.ExpectColumnValuesToBeInSet(
-            column="has_description",
             value_set=[True, False],
             severity="critical",
         ),

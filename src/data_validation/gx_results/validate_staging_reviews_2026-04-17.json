@@ -1,7 +1,7 @@
 {
-  "entity": "products",
-  "ingest_dt": "2026-04-02",
-  "partition_path": "s3://project-3-recommender-system/staging/products/ingest_dt=2026-04-02/",
+  "entity": "reviews",
+  "ingest_dt": "2026-04-17",
+  "partition_path": "s3://project-3-recommender-system/staging/reviews/ingest_dt=2026-04-17/",
   "success": true,
   "expectations": [
     {
@@ -9,14 +9,40 @@
       "expectation_config": {
         "type": "expect_column_values_to_not_be_null",
         "kwargs": {
-          "batch_id": "staging_products_ds-staging_products_asset",
+          "batch_id": "staging_reviews_ds-staging_reviews_asset",
           "column": "asin"
         },
         "meta": {},
         "severity": "critical"
       },
       "result": {
-        "element_count": 89891,
+        "element_count": 806410,
+        "unexpected_count": 0,
+        "unexpected_percent": 0.0,
+        "partial_unexpected_list": [],
+        "partial_unexpected_counts": [],
+        "partial_unexpected_index_list": []
+      },
+      "meta": {},
+      "exception_info": {
+        "raised_exception": false,
+        "exception_traceback": null,
+        "exception_message": null
+      }
+    },
+    {
+      "success": true,
+      "expectation_config": {
+        "type": "expect_column_values_to_not_be_null",
+        "kwargs": {
+          "batch_id": "staging_reviews_ds-staging_reviews_asset",
+          "column": "reviewer_id"
+        },
+        "meta": {},
+        "severity": "critical"
+      },
+      "result": {
+        "element_count": 806410,
         "unexpected_count": 0,
         "unexpected_percent": 0.0,
         "partial_unexpected_list": [],
@@ -35,14 +61,14 @@
       "expectation_config": {
         "type": "expect_column_values_to_be_unique",
         "kwargs": {
-          "batch_id": "staging_products_ds-staging_products_asset",
-          "column": "asin"
+          "batch_id": "staging_reviews_ds-staging_reviews_asset",
+          "column": "review_id"
         },
         "meta": {},
         "severity": "critical"
       },
       "result": {
-        "element_count": 89891,
+        "element_count": 806410,
         "unexpected_count": 0,
         "unexpected_percent": 0.0,
         "partial_unexpected_list": [],
@@ -63,98 +89,28 @@
     {
       "success": true,
       "expectation_config": {
-        "type": "expect_column_proportion_of_non_null_values_to_be_between",
+        "type": "expect_column_values_to_be_between",
         "kwargs": {
-          "batch_id": "staging_products_ds-staging_products_asset",
-          "column": "title",
-          "min_value": 0.95,
-          "max_value": 1.0
+          "batch_id": "staging_reviews_ds-staging_reviews_asset",
+          "column": "rating",
+          "min_value": 1.0,
+          "max_value": 5.0
         },
         "meta": {},
-        "severity": "warning"
+        "severity": "critical"
       },
       "result": {
-        "observed_value": 0.9999777508315627
+        "element_count": 806410,
+        "unexpected_count": 0,
+        "unexpected_percent": 0.0,
+        "partial_unexpected_list": [],
+        "missing_count": 0,
+        "missing_percent": 0.0,
+        "unexpected_percent_total": 0.0,
+        "unexpected_percent_nonmissing": 0.0,
+        "partial_unexpected_counts": [],
+        "partial_unexpected_index_list": []
       },
-      "meta": {},
-      "exception_info": {
-        "raised_exception": false,
-        "exception_traceback": null,
-        "exception_message": null
-      }
-    },
-    {
-      "success": true,
-      "expectation_config": {
-        "type": "expect_column_values_to_be_of_type",
-        "kwargs": {
-          "batch_id": "staging_products_ds-staging_products_asset",
-          "column": "price",
-          "type_": "float64"
-        },
-        "meta": {},
-        "severity": "warning"
-      },
-      "result": {
-        "observed_value": "float64"
-      },
-      "meta": {},
-      "exception_info": {
-        "raised_exception": false,
-        "exception_traceback": null,
-        "exception_message": null
-      }
-    },
-    {
-      "success": true,
-      "expectation_config": {
-        "type": "expect_column_to_exist",
-        "kwargs": {
-          "batch_id": "staging_products_ds-staging_products_asset",
-          "column": "categories"
-        },
-        "meta": {},
-        "severity": "critical"
-      },
-      "result": {},
-      "meta": {},
-      "exception_info": {
-        "raised_exception": false,
-        "exception_traceback": null,
-        "exception_message": null
-      }
-    },
-    {
-      "success": true,
-      "expectation_config": {
-        "type": "expect_column_to_exist",
-        "kwargs": {
-          "batch_id": "staging_products_ds-staging_products_asset",
-          "column": "also_buy"
-        },
-        "meta": {},
-        "severity": "critical"
-      },
-      "result": {},
-      "meta": {},
-      "exception_info": {
-        "raised_exception": false,
-        "exception_traceback": null,
-        "exception_message": null
-      }
-    },
-    {
-      "success": true,
-      "expectation_config": {
-        "type": "expect_column_to_exist",
-        "kwargs": {
-          "batch_id": "staging_products_ds-staging_products_asset",
-          "column": "also_view"
-        },
-        "meta": {},
-        "severity": "critical"
-      },
-      "result": {},
       "meta": {},
       "exception_info": {
         "raised_exception": false,
@@ -167,18 +123,51 @@
       "expectation_config": {
         "type": "expect_column_values_to_not_be_null",
         "kwargs": {
-          "batch_id": "staging_products_ds-staging_products_asset",
-          "column": "categories",
-          "mostly": 0.8
+          "batch_id": "staging_reviews_ds-staging_reviews_asset",
+          "column": "review_time"
+        },
+        "meta": {},
+        "severity": "critical"
+      },
+      "result": {
+        "element_count": 806410,
+        "unexpected_count": 0,
+        "unexpected_percent": 0.0,
+        "partial_unexpected_list": [],
+        "partial_unexpected_counts": [],
+        "partial_unexpected_index_list": []
+      },
+      "meta": {},
+      "exception_info": {
+        "raised_exception": false,
+        "exception_traceback": null,
+        "exception_message": null
+      }
+    },
+    {
+      "success": true,
+      "expectation_config": {
+        "type": "expect_column_values_to_be_in_type_list",
+        "kwargs": {
+          "batch_id": "staging_reviews_ds-staging_reviews_asset",
+          "column": "review_text",
+          "type_list": [
+            "str",
+            "string"
+          ]
         },
         "meta": {},
         "severity": "warning"
       },
       "result": {
-        "element_count": 89891,
+        "element_count": 806410,
         "unexpected_count": 0,
         "unexpected_percent": 0.0,
         "partial_unexpected_list": [],
+        "missing_count": 402,
+        "missing_percent": 0.04985057228953013,
+        "unexpected_percent_total": 0.0,
+        "unexpected_percent_nonmissing": 0.0,
         "partial_unexpected_counts": [],
         "partial_unexpected_index_list": []
       },
