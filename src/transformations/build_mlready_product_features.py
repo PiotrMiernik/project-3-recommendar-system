@@ -1,7 +1,7 @@
 """
 This script transforms staging product metadata into an ML-ready Gold table.
-It handles deduplication, price extraction, and computes product-level features 
-used for generating recommendations.
+It handles deduplication, price extraction, HTML unescaping, and computes 
+product-level features used for generating recommendations.
 """
 
 import argparse
@@ -40,19 +40,34 @@ def create_spark_session(app_name: str) -> SparkSession:
     )
 
 def build_product_features(df: DataFrame, execution_date: str) -> DataFrame:
+    """
+    Core transformation logic including HTML unescaping and feature engineering.
+    """
     price_col = extract_price(df)
     desc_type = get_dtype(df, "description")
 
     return (
         df
+        # 1. Clean HTML entities from title (e.g., &quot; -> ")
+        .withColumn("title", F.unescape(F.col("title")))
+        
+        # 2. Extract price using helper
         .withColumn("price", price_col)
+        
+        # 3. Feature engineering
         .withColumn("has_brand", F.when(F.col("brand").isNotNull() & (F.trim(F.col("brand")) != ""), True).otherwise(False))
         .withColumn("has_price", F.col("price").isNotNull() & (F.col("price") > 0))
         .withColumn("title_length", F.length(F.coalesce(F.col("title"), F.lit(""))))
+        
+        # 4. Handle description array to compute total length
         .withColumn("description_total_length", 
             F.aggregate(F.coalesce(F.col("description"), F.array()), F.lit(0), lambda acc, x: acc + F.length(F.coalesce(x, F.lit(""))))
             if isinstance(desc_type, T.ArrayType) else F.lit(0))
+        
+        # 5. Metadata
         .withColumn("feature_snapshot_date", F.to_date(F.lit(execution_date)))
+        
+        # 6. Final schema selection
         .select(
             "asin", "title", "brand", "price", "has_brand", "has_price", 
             "title_length", "description_total_length", "main_category", "feature_snapshot_date"
@@ -65,13 +80,23 @@ def main():
     
     try:
         logger.info(f"Processing product features for {args.execution_date}")
+        
+        # Load and Deduplicate
         input_df = spark.read.parquet(args.input_path)
         deduped_df = deduplicate_by_key(input_df, key_col="asin")
+        
+        # Transform
         final_df = build_product_features(deduped_df, args.execution_date)
 
+        # Write to Iceberg
         target_table = iceberg_cfg["table_products"]
         logger.info(f"Writing to Iceberg: {target_table}")
+        
+        # Using createOrReplace for the initial/full load
+        # Use append or merge if you plan to update incrementally
         final_df.writeTo(target_table).using("iceberg").createOrReplace()
+        
+        logger.info("Product features built successfully.")
         
     except Exception as e:
         logger.error(f"Failed to build product features: {e}")
