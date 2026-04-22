@@ -18,8 +18,14 @@ test.sql
 terraform.tfvars      
 .terraform.lock.hcl   
 
+# Airflow
+logs/
+airflow/logs/
+airflow/*.db
+airflow/*.pid
 .airflow/
 airflow_home/
+
 .venv/
 __pycache__/
 *.db
