@@ -12,8 +12,6 @@ This module is intentionally lightweight and independent from Spark.
 It is designed to be reused by the embeddings pipeline scripts.
 """
 
-from __future__ import annotations
-
 import html
 import re
 from typing import List, Optional, Sequence

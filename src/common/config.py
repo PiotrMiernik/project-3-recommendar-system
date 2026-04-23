@@ -32,7 +32,6 @@ def load_settings() -> dict:
         "rds_dbname": get_required_env("RDS_DBNAME"),
         "rds_user": get_required_env("RDS_USER"),
         "rds_password": get_required_env("RDS_PASSWORD"),
-        "embedding_model_version": os.getenv("EMBEDDING_MODEL_VERSION", "all-MiniLM-L6-v2"),
         "chunk_size": int(os.getenv("CHUNK_SIZE", "5000")),
     }
     return settings
@@ -44,6 +43,7 @@ def load_emr_transform_settings() -> dict:
         "s3_raw_prefix": os.getenv("S3_RAW_PREFIX", "raw/"),
         "s3_staging_prefix": os.getenv("S3_STAGING_PREFIX", "staging/"),
         "s3_mlready_prefix": os.getenv("S3_MLREADY_PREFIX", "mlready/"),
+        "embedding_model_version": os.getenv("EMBEDDING_MODEL_VERSION", "all-MiniLM-L6-v2"),
     }
 
 def get_iceberg_settings() -> dict:
