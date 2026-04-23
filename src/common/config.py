@@ -44,6 +44,7 @@ def load_emr_transform_settings() -> dict:
         "s3_staging_prefix": os.getenv("S3_STAGING_PREFIX", "staging/"),
         "s3_mlready_prefix": os.getenv("S3_MLREADY_PREFIX", "mlready/"),
         "embedding_model_version": os.getenv("EMBEDDING_MODEL_VERSION", "all-MiniLM-L6-v2"),
+        "embedding_batch_size": int(os.getenv("EMBEDDING_BATCH_SIZE", "32")),
     }
 
 def get_iceberg_settings() -> dict:
