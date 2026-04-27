@@ -12,10 +12,14 @@
 # 8. Validate mlready product_features locally with Great Expectations
 # 9. Build mlready user_features on EMR Serverless
 # 10. Validate mlready user_features locally with Great Expectations
-# 11. Build mlready product review stats on EMR Serverless
-# 12. Validate mlready product review stats locally with Great Expectations
+# 11. Build mlready product_review_stats on EMR Serverless
+# 12. Validate mlready product_review_stats locally with Great Expectations
 # 13. Build mlready user_product_interactions on EMR Serverless
 # 14. Validate mlready user_product_interactions locally with Great Expectations
+# 15. Prepare and filter reviews for embedding generation on EMR Serverless
+# 16. Generate review embeddings on EMR Serverless
+# 17. Load review embeddings into pgvector locally
+# 18. Validate pgvector review embeddings locally with SQL-based checks
 
 from datetime import datetime, timedelta
 
@@ -26,6 +30,7 @@ from airflow.operators.python import PythonOperator
 from airflow.providers.amazon.aws.operators.emr import EmrServerlessStartJobOperator
 
 from src.common.s3_utils import build_manifest_key
+
 from src.data_validation.validate_staging_products import run_staging_products_validation
 from src.data_validation.validate_staging_reviews import run_staging_reviews_validation
 from src.data_validation.validate_mlready_product_features import (
@@ -40,8 +45,13 @@ from src.data_validation.validate_mlready_product_review_stats import (
 from src.data_validation.validate_mlready_user_product_interactions import (
     run_mlready_user_product_interactions_validation,
 )
+from src.data_validation.validate_review_embeddings import validate_review_embeddings
+
 from src.ingestion.ingest_products_to_s3_raw import main as ingest_products_main
 from src.ingestion.ingest_reviews_to_s3_raw import main as ingest_reviews_main
+from src.embeddings.step3_load_reviews_embeddings_to_pgvector import (
+    run_load_review_embeddings_to_pgvector,
+)
 
 
 default_args = {
@@ -61,13 +71,23 @@ S3_BUCKET = "project-3-recommender-system"
 
 PRODUCTS_SCRIPT_S3_URI = f"s3://{S3_BUCKET}/jobs/transform_raw_products_to_staging.py"
 REVIEWS_SCRIPT_S3_URI = f"s3://{S3_BUCKET}/jobs/transform_raw_reviews_to_staging.py"
-PY_FILES_S3_URI = f"s3://{S3_BUCKET}/jobs/src_package.zip"
-EMR_LOGS_S3_URI = f"s3://{S3_BUCKET}/logs/emr-serverless/"
 
 MLREADY_PRODUCTS_SCRIPT = f"s3://{S3_BUCKET}/jobs/build_mlready_product_features.py"
 MLREADY_USERS_SCRIPT = f"s3://{S3_BUCKET}/jobs/build_mlready_user_features.py"
 MLREADY_STATS_SCRIPT = f"s3://{S3_BUCKET}/jobs/build_mlready_product_review_stats.py"
-MLREADY_INTERACTIONS_SCRIPT = f"s3://{S3_BUCKET}/jobs/build_mlready_user_product_interactions.py"
+MLREADY_INTERACTIONS_SCRIPT = (
+    f"s3://{S3_BUCKET}/jobs/build_mlready_user_product_interactions.py"
+)
+
+PREPARE_REVIEWS_FOR_EMBEDDINGS_SCRIPT = (
+    f"s3://{S3_BUCKET}/jobs/step1_prepare_and_filter_reviews.py"
+)
+GENERATE_REVIEW_EMBEDDINGS_SCRIPT = (
+    f"s3://{S3_BUCKET}/jobs/step2_generate_review_embeddings.py"
+)
+
+PY_FILES_S3_URI = f"s3://{S3_BUCKET}/jobs/src_package.zip"
+EMR_LOGS_S3_URI = f"s3://{S3_BUCKET}/logs/emr-serverless/"
 
 COMMON_CONFIGURATION_OVERRIDES = {
     "monitoringConfiguration": {
@@ -80,20 +100,31 @@ COMMON_CONFIGURATION_OVERRIDES = {
             "classification": "spark-defaults",
             "properties": {
                 "spark.submit.pyFiles": PY_FILES_S3_URI,
+
+                # Driver environment variables
                 "spark.emr-serverless.driverEnv.AWS_REGION": "eu-central-1",
                 "spark.emr-serverless.driverEnv.S3_BUCKET": S3_BUCKET,
                 "spark.emr-serverless.driverEnv.S3_RAW_PREFIX": "raw/",
                 "spark.emr-serverless.driverEnv.S3_STAGING_PREFIX": "staging/",
                 "spark.emr-serverless.driverEnv.S3_MLREADY_PREFIX": "mlready/",
+                "spark.emr-serverless.driverEnv.EMBEDDING_MODEL_VERSION": (
+                    "all-MiniLM-L6-v2"
+                ),
+                "spark.emr-serverless.driverEnv.EMBEDDING_BATCH_SIZE": "32",
+
+                # Executor environment variables
                 "spark.executorEnv.AWS_REGION": "eu-central-1",
                 "spark.executorEnv.S3_BUCKET": S3_BUCKET,
                 "spark.executorEnv.S3_RAW_PREFIX": "raw/",
                 "spark.executorEnv.S3_STAGING_PREFIX": "staging/",
                 "spark.executorEnv.S3_MLREADY_PREFIX": "mlready/",
+                "spark.executorEnv.EMBEDDING_MODEL_VERSION": "all-MiniLM-L6-v2",
+                "spark.executorEnv.EMBEDDING_BATCH_SIZE": "32",
             },
         }
     ],
 }
+
 
 with DAG(
     dag_id="recommender_system_pipeline_prod",
@@ -291,6 +322,51 @@ with DAG(
         op_kwargs={"execution_date": "{{ ds }}"},
     )
 
+    # ------------------------------------------------------------------
+    # PHASE 6: TEXT PIPELINE - REVIEW EMBEDDINGS + PGVECTOR
+    # ------------------------------------------------------------------
+
+    prepare_and_filter_reviews_for_embeddings = EmrServerlessStartJobOperator(
+        task_id="prepare_and_filter_reviews_for_embeddings",
+        application_id=EMR_SERVERLESS_APPLICATION_ID,
+        execution_role_arn=EMR_SERVERLESS_EXECUTION_ROLE_ARN,
+        aws_conn_id=AWS_CONN_ID,
+        wait_for_completion=True,
+        job_driver={
+            "sparkSubmit": {
+                "entryPoint": PREPARE_REVIEWS_FOR_EMBEDDINGS_SCRIPT,
+                "sparkSubmitParameters": f"--py-files {PY_FILES_S3_URI}",
+            }
+        },
+        configuration_overrides=COMMON_CONFIGURATION_OVERRIDES,
+    )
+
+    generate_review_embeddings = EmrServerlessStartJobOperator(
+        task_id="generate_review_embeddings",
+        application_id=EMR_SERVERLESS_APPLICATION_ID,
+        execution_role_arn=EMR_SERVERLESS_EXECUTION_ROLE_ARN,
+        aws_conn_id=AWS_CONN_ID,
+        wait_for_completion=True,
+        job_driver={
+            "sparkSubmit": {
+                "entryPoint": GENERATE_REVIEW_EMBEDDINGS_SCRIPT,
+                "sparkSubmitParameters": f"--py-files {PY_FILES_S3_URI}",
+            }
+        },
+        configuration_overrides=COMMON_CONFIGURATION_OVERRIDES,
+    )
+
+    load_review_embeddings_to_pgvector = PythonOperator(
+        task_id="load_review_embeddings_to_pgvector",
+        python_callable=run_load_review_embeddings_to_pgvector,
+        op_kwargs={"ingest_dt": "{{ ds }}"},
+    )
+
+    validate_pgvector_review_embeddings = PythonOperator(
+        task_id="validate_pgvector_review_embeddings",
+        python_callable=validate_review_embeddings,
+    )
+
     end = EmptyOperator(task_id="end")
 
     # ------------------------------------------------------------------
@@ -317,4 +393,8 @@ with DAG(
     validate_mlready_product_review_stats >> build_mlready_user_product_interactions
     build_mlready_user_product_interactions >> validate_mlready_user_product_interactions
 
-    validate_mlready_user_product_interactions >> end
+    validate_mlready_user_product_interactions >> prepare_and_filter_reviews_for_embeddings
+    prepare_and_filter_reviews_for_embeddings >> generate_review_embeddings
+    generate_review_embeddings >> load_review_embeddings_to_pgvector
+    load_review_embeddings_to_pgvector >> validate_pgvector_review_embeddings
+    validate_pgvector_review_embeddings >> end
