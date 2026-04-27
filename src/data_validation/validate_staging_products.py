@@ -1,9 +1,8 @@
 import json
-from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List
 
-import psycopg2
+import great_expectations as gx
+import pandas as pd
 
 from src.common.config import load_settings
 from src.common.logging import get_logger
@@ -11,136 +10,184 @@ from src.common.logging import get_logger
 
 logger = get_logger(__name__)
 
-SCHEMA_NAME = "vector"
-TABLE_NAME = "review_embeddings"
-EXPECTED_VECTOR_DIM = 384
+ENTITY = "products"
 
 
-# Database connection
-def get_db_connection(settings: dict):
+# S3 path resolution
+def build_partition_path(settings: dict, ingest_dt: str) -> str:
     """
-    Create and return a PostgreSQL connection.
+    Build S3 path for a specific staging partition.
+    Example:
+    s3://bucket/staging/products/ingest_dt=YYYY-MM-DD/
     """
-    return psycopg2.connect(
-        host=settings["rds_host"],
-        port=settings["rds_port"],
-        dbname=settings["rds_dbname"],
-        user=settings["rds_user"],
-        password=settings["rds_password"],
+    bucket = settings["s3_bucket"]
+    prefix = settings["s3_staging_prefix"]
+    return f"s3://{bucket}/{prefix}{ENTITY}/ingest_dt={ingest_dt}/"
+
+
+# Data loading
+def read_staging_partition(partition_path: str, aws_region: str) -> pd.DataFrame:
+    """
+    Load Parquet data from S3 staging into a Pandas DataFrame.
+    Uses pyarrow + s3fs under the hood.
+    """
+    logger.info(f"Reading staging data from: {partition_path}")
+
+    df = pd.read_parquet(
+        partition_path,
+        engine="pyarrow",
+        storage_options={"client_kwargs": {"region_name": aws_region}},
     )
 
+    if df.empty:
+        raise ValueError(f"Staging partition is empty: {partition_path}")
 
-# Validation helpers
-def run_scalar_query(conn, query: str) -> int:
+    return df
+
+
+# Great Expectations setup
+def build_batch(df: pd.DataFrame):
     """
-    Execute a SQL query that returns a single scalar integer value.
+    Create a Great Expectations batch from a Pandas DataFrame.
     """
-    with conn.cursor() as cursor:
-        cursor.execute(query)
-        result = cursor.fetchone()
+    context = gx.get_context()
 
-    if result is None:
-        raise ValueError("Scalar query returned no result.")
-
-    return int(result[0])
-
-
-def build_checks(conn) -> List[Dict[str, Any]]:
-    """
-    Run all validation checks for vector.review_embeddings.
-    Returns a list of normalized check results.
-    """
-    total_count = run_scalar_query(
-        conn,
-        f"""
-        SELECT COUNT(*)
-        FROM {SCHEMA_NAME}.{TABLE_NAME}
-        """
+    data_source = context.data_sources.add_pandas("staging_products_ds")
+    data_asset = data_source.add_dataframe_asset(name="staging_products_asset")
+    batch_definition = data_asset.add_batch_definition_whole_dataframe(
+        "staging_products_batch"
     )
 
-    null_count = run_scalar_query(
-        conn,
-        f"""
-        SELECT COUNT(*)
-        FROM {SCHEMA_NAME}.{TABLE_NAME}
-        WHERE review_id IS NULL
-           OR embedding IS NULL
-           OR model_version IS NULL
-           OR text_hash IS NULL
-        """
-    )
+    batch = batch_definition.get_batch(batch_parameters={"dataframe": df})
 
-    duplicate_review_id_count = run_scalar_query(
-        conn,
-        f"""
-        SELECT COUNT(*)
-        FROM (
-            SELECT review_id
-            FROM {SCHEMA_NAME}.{TABLE_NAME}
-            GROUP BY review_id
-            HAVING COUNT(*) > 1
-        ) AS duplicates
-        """
-    )
+    return batch
 
-    invalid_vector_dim_count = run_scalar_query(
-        conn,
-        f"""
-        SELECT COUNT(*)
-        FROM {SCHEMA_NAME}.{TABLE_NAME}
-        WHERE vector_dims(embedding) != {EXPECTED_VECTOR_DIM}
-        """
-    )
 
+# Expectations
+def build_expectations():
+    """
+    Define all expectations for staging_products.
+    """
     return [
-        {
-            "check_name": "table_not_empty",
-            "metric_value": total_count,
-            "expected_condition": "count > 0",
-            "success": total_count > 0,
-        },
-        {
-            "check_name": "no_nulls_in_required_columns",
-            "metric_value": null_count,
-            "expected_condition": "count = 0",
-            "success": null_count == 0,
-        },
-        {
-            "check_name": "no_duplicate_review_id",
-            "metric_value": duplicate_review_id_count,
-            "expected_condition": "count = 0",
-            "success": duplicate_review_id_count == 0,
-        },
-        {
-            "check_name": "all_embeddings_have_expected_dimension",
-            "metric_value": invalid_vector_dim_count,
-            "expected_condition": f"count = 0 for vector_dims(embedding) != {EXPECTED_VECTOR_DIM}",
-            "success": invalid_vector_dim_count == 0,
-        },
+        # Check if asin exists and has no missing values
+        gx.expectations.ExpectColumnValuesToNotBeNull(
+            column="asin", 
+            severity="critical"
+        ),
+
+        # Ensure asin is unique across the entire dataset
+        gx.expectations.ExpectColumnValuesToBeUnique(
+            column="asin", 
+            severity="critical"
+        ),
+
+        # Validate that at least 95% of products have a title
+        gx.expectations.ExpectColumnProportionOfNonNullValuesToBeBetween(
+            column="title",
+            min_value=0.95,
+            max_value=1.0,
+            severity="warning",
+        ),
+
+        # Verify that the price column is correctly parsed as float
+        gx.expectations.ExpectColumnValuesToBeOfType(
+            column="price",
+            type_="float64",
+            severity="warning",
+        ),
+
+        # Ensure 'categories' column exists (structural check)
+        gx.expectations.ExpectColumnToExist(column="categories"),
+
+        # Ensure 'also_buy' column exists (structural check)
+        gx.expectations.ExpectColumnToExist(column="also_buy"),
+
+        # Ensure 'also_view' column exists (structural check)
+        gx.expectations.ExpectColumnToExist(column="also_view"),
+
+        # Verify that 'categories' are mostly not null (allows empty lists [])
+        gx.expectations.ExpectColumnValuesToNotBeNull(
+            column="categories", 
+            mostly=0.8,
+            severity="warning"
+        ),
     ]
 
-
-def run_validation(conn):
+# Validation helpers
+def normalize_result(result) -> dict:
     """
-    Execute all validation checks and return overall success flag
-    together with detailed results.
+    Normalize a GX result object to dictionary format.
+    Handles multiple GX return types.
     """
-    checks = build_checks(conn)
-    overall_success = all(check["success"] for check in checks)
+    if hasattr(result, "to_json_dict"):
+        return result.to_json_dict()
 
-    for check in checks:
-        logger.info(
-            f"{check['check_name']} -> success={check['success']} | "
-            f"metric_value={check['metric_value']}"
+    if isinstance(result, dict):
+        return result
+
+    if hasattr(result, "model_dump"):
+        return result.model_dump()
+
+    return {"raw_result": str(result)}
+
+
+def extract_success(result_dict: dict) -> bool:
+    """
+    Extract the success flag from a GX result dictionary.
+    """
+    return bool(result_dict.get("success", False))
+
+
+def run_validation(df: pd.DataFrame):
+    """
+    Execute all expectations against the dataset.
+    Returns overall success flag and detailed results.
+    """
+    batch = build_batch(df)
+    expectations = build_expectations()
+
+    results = []
+
+    for expectation in expectations:
+        result = batch.validate(expectation)
+        result_dict = normalize_result(result)
+
+        results.append(result_dict)
+
+        expectation_type = (
+            result_dict.get("expectation_config", {}).get("type")
+            or result_dict.get("expectation_type")
+            or type(expectation).__name__
         )
 
-    return overall_success, checks
+        success = extract_success(result_dict)
+
+        result_details = result_dict.get("result", {})
+        unexpected_count = result_details.get("unexpected_count")
+        unexpected_percent = result_details.get("unexpected_percent")
+        partial_unexpected = result_details.get("partial_unexpected_list")
+
+        logger.info(
+            f"{expectation_type} -> success={success} | "
+            f"unexpected_count={unexpected_count} | "
+            f"unexpected_percent={unexpected_percent}"
+        )
+
+        if not success and partial_unexpected:
+            logger.warning(
+                f"{expectation_type} sample unexpected values: {partial_unexpected[:5]}"
+            )
+
+    overall_success = all(extract_success(r) for r in results)
+
+    return overall_success, results
 
 
 # Save results
 def save_results(
     output_dir: str,
-    execution_date: str,
+    ingest_dt: str,
+    partition_path: str,
     success: bool,
     results: list,
 ):
@@ -149,15 +196,14 @@ def save_results(
     """
     Path(output_dir).mkdir(parents=True, exist_ok=True)
 
-    output_path = Path(output_dir) / f"validate_review_embeddings_{execution_date}.json"
+    output_path = Path(output_dir) / f"validate_staging_products_{ingest_dt}.json"
 
     payload = {
-        "schema_name": SCHEMA_NAME,
-        "table_name": TABLE_NAME,
-        "execution_date": execution_date,
-        "expected_vector_dimension": EXPECTED_VECTOR_DIM,
+        "entity": ENTITY,
+        "ingest_dt": ingest_dt,
+        "partition_path": partition_path,
         "success": success,
-        "checks": results,
+        "expectations": results,
     }
 
     output_path.write_text(
@@ -169,29 +215,33 @@ def save_results(
 
 
 # Airflow entrypoint
-def validate_review_embeddings(
-    output_dir: str = "src/data_validation/validation_results",
+def run_staging_products_validation(
+    ingest_dt: str,
+    output_dir: str = "src/data_validation/gx_results",
 ) -> None:
     """
     Main entrypoint for Airflow.
-    Runs SQL-based validation for vector.review_embeddings.
+    Runs Great Expectations validation for a single staging products partition.
     """
     settings = load_settings()
-    execution_date = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
 
-    logger.info(f"Starting validation for {SCHEMA_NAME}.{TABLE_NAME}")
-    logger.info(f"Execution date: {execution_date}")
+    logger.info("Starting validation for staging_products")
+    logger.info(f"Target ingest_dt: {ingest_dt}")
 
-    conn = None
+    partition_path = build_partition_path(settings, ingest_dt)
 
     try:
-        conn = get_db_connection(settings)
+        df = read_staging_partition(partition_path, settings["aws_region"])
 
-        success, results = run_validation(conn)
+        logger.info(f"Rows: {len(df)}")
+        logger.info(f"Columns: {list(df.columns)}")
+
+        success, results = run_validation(df)
 
         result_path = save_results(
             output_dir=output_dir,
-            execution_date=execution_date,
+            ingest_dt=ingest_dt,
+            partition_path=partition_path,
             success=success,
             results=results,
         )
@@ -200,16 +250,8 @@ def validate_review_embeddings(
         logger.info(f"Validation success: {success}")
 
         if not success:
-            raise ValueError(f"Validation failed for {SCHEMA_NAME}.{TABLE_NAME}")
+            raise ValueError("Validation failed for staging_products")
 
     except Exception as exc:
-        logger.exception(f"Validation failed for {SCHEMA_NAME}.{TABLE_NAME}: {exc}")
+        logger.exception(f"Validation failed for staging_products: {exc}")
         raise
-
-    finally:
-        if conn is not None:
-            conn.close()
-
-
-if __name__ == "__main__":
-    validate_review_embeddings()
