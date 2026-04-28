@@ -17,8 +17,6 @@ import re
 from typing import List, Optional, Sequence
 
 import numpy as np
-from sentence_transformers import SentenceTransformer
-
 
 def clean_text(text: Optional[str]) -> Optional[str]:
     """
@@ -76,12 +74,13 @@ def load_embedding_model(model_name: str) -> SentenceTransformer:
     Example:
     - all-MiniLM-L6-v2
     """
+    from sentence_transformers import SentenceTransformer
     return SentenceTransformer(model_name)
 
 
 def generate_embeddings(
     texts: List[str],
-    model: SentenceTransformer,
+    model,
     batch_size: int = 32,
 ) -> List[List[float]]:
     """
