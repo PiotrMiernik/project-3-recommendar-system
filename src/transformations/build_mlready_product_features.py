@@ -13,6 +13,7 @@ from pyspark.sql import types as T
 from src.common.config import load_emr_transform_settings, get_iceberg_settings
 from src.common.logging import get_logger
 from src.common.spark_utils import get_dtype, extract_price, deduplicate_by_key
+from src.common.embedding_utils import clean_text
 
 logger = get_logger(__name__)
 iceberg_cfg = get_iceberg_settings()
@@ -45,11 +46,12 @@ def build_product_features(df: DataFrame, execution_date: str) -> DataFrame:
     """
     price_col = extract_price(df)
     desc_type = get_dtype(df, "description")
+    clean_text_udf = F.udf(clean_text, T.StringType())
 
     return (
         df
         # 1. Clean HTML entities from title (e.g., &quot; -> ")
-        .withColumn("title", F.unescape(F.col("title")))
+        .withColumn("title", clean_text_udf(F.col("title")))
         
         # 2. Extract price using helper
         .withColumn("price", price_col)

@@ -1,7 +1,7 @@
 {
   "entity": "products",
-  "ingest_dt": "2026-04-17",
-  "partition_path": "s3://project-3-recommender-system/staging/products/ingest_dt=2026-04-17/",
+  "ingest_dt": "2026-04-28",
+  "partition_path": "s3://project-3-recommender-system/staging/products/ingest_dt=2026-04-28/",
   "success": true,
   "expectations": [
     {
