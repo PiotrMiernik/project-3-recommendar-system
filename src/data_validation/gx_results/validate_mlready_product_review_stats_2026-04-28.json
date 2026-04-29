@@ -1,0 +1,639 @@
+{
+  "entity": "product_review_stats",
+  "execution_date": "2026-04-28",
+  "table_name": "glue_catalog.mlready.global_stats",
+  "success": true,
+  "expectations": [
+    {
+      "success": true,
+      "expectation_config": {
+        "type": "expect_column_values_to_not_be_null",
+        "kwargs": {
+          "batch_id": "mlready_product_review_stats_ds-mlready_product_review_stats_asset",
+          "column": "asin"
+        },
+        "meta": {},
+        "severity": "critical"
+      },
+      "result": {
+        "element_count": 11436,
+        "unexpected_count": 0,
+        "unexpected_percent": 0.0,
+        "partial_unexpected_list": [],
+        "partial_unexpected_counts": []
+      },
+      "meta": {},
+      "exception_info": {
+        "raised_exception": false,
+        "exception_traceback": null,
+        "exception_message": null
+      }
+    },
+    {
+      "success": true,
+      "expectation_config": {
+        "type": "expect_column_values_to_be_unique",
+        "kwargs": {
+          "batch_id": "mlready_product_review_stats_ds-mlready_product_review_stats_asset",
+          "column": "asin"
+        },
+        "meta": {},
+        "severity": "critical"
+      },
+      "result": {
+        "element_count": 11436,
+        "unexpected_count": 0,
+        "unexpected_percent": 0.0,
+        "partial_unexpected_list": [],
+        "missing_count": 0,
+        "missing_percent": 0.0,
+        "unexpected_percent_total": 0.0,
+        "unexpected_percent_nonmissing": 0.0,
+        "partial_unexpected_counts": []
+      },
+      "meta": {},
+      "exception_info": {
+        "raised_exception": false,
+        "exception_traceback": null,
+        "exception_message": null
+      }
+    },
+    {
+      "success": true,
+      "expectation_config": {
+        "type": "expect_column_to_exist",
+        "kwargs": {
+          "batch_id": "mlready_product_review_stats_ds-mlready_product_review_stats_asset",
+          "column": "reviews_count"
+        },
+        "meta": {},
+        "severity": "critical"
+      },
+      "result": {},
+      "meta": {},
+      "exception_info": {
+        "raised_exception": false,
+        "exception_traceback": null,
+        "exception_message": null
+      }
+    },
+    {
+      "success": true,
+      "expectation_config": {
+        "type": "expect_column_to_exist",
+        "kwargs": {
+          "batch_id": "mlready_product_review_stats_ds-mlready_product_review_stats_asset",
+          "column": "distinct_reviewers_count"
+        },
+        "meta": {},
+        "severity": "critical"
+      },
+      "result": {},
+      "meta": {},
+      "exception_info": {
+        "raised_exception": false,
+        "exception_traceback": null,
+        "exception_message": null
+      }
+    },
+    {
+      "success": true,
+      "expectation_config": {
+        "type": "expect_column_to_exist",
+        "kwargs": {
+          "batch_id": "mlready_product_review_stats_ds-mlready_product_review_stats_asset",
+          "column": "avg_rating"
+        },
+        "meta": {},
+        "severity": "critical"
+      },
+      "result": {},
+      "meta": {},
+      "exception_info": {
+        "raised_exception": false,
+        "exception_traceback": null,
+        "exception_message": null
+      }
+    },
+    {
+      "success": true,
+      "expectation_config": {
+        "type": "expect_column_to_exist",
+        "kwargs": {
+          "batch_id": "mlready_product_review_stats_ds-mlready_product_review_stats_asset",
+          "column": "rating_stddev"
+        },
+        "meta": {},
+        "severity": "critical"
+      },
+      "result": {},
+      "meta": {},
+      "exception_info": {
+        "raised_exception": false,
+        "exception_traceback": null,
+        "exception_message": null
+      }
+    },
+    {
+      "success": true,
+      "expectation_config": {
+        "type": "expect_column_to_exist",
+        "kwargs": {
+          "batch_id": "mlready_product_review_stats_ds-mlready_product_review_stats_asset",
+          "column": "verified_reviews_ratio"
+        },
+        "meta": {},
+        "severity": "critical"
+      },
+      "result": {},
+      "meta": {},
+      "exception_info": {
+        "raised_exception": false,
+        "exception_traceback": null,
+        "exception_message": null
+      }
+    },
+    {
+      "success": true,
+      "expectation_config": {
+        "type": "expect_column_to_exist",
+        "kwargs": {
+          "batch_id": "mlready_product_review_stats_ds-mlready_product_review_stats_asset",
+          "column": "avg_vote_count"
+        },
+        "meta": {},
+        "severity": "critical"
+      },
+      "result": {},
+      "meta": {},
+      "exception_info": {
+        "raised_exception": false,
+        "exception_traceback": null,
+        "exception_message": null
+      }
+    },
+    {
+      "success": true,
+      "expectation_config": {
+        "type": "expect_column_to_exist",
+        "kwargs": {
+          "batch_id": "mlready_product_review_stats_ds-mlready_product_review_stats_asset",
+          "column": "avg_review_text_length"
+        },
+        "meta": {},
+        "severity": "critical"
+      },
+      "result": {},
+      "meta": {},
+      "exception_info": {
+        "raised_exception": false,
+        "exception_traceback": null,
+        "exception_message": null
+      }
+    },
+    {
+      "success": true,
+      "expectation_config": {
+        "type": "expect_column_to_exist",
+        "kwargs": {
+          "batch_id": "mlready_product_review_stats_ds-mlready_product_review_stats_asset",
+          "column": "positive_reviews_ratio"
+        },
+        "meta": {},
+        "severity": "critical"
+      },
+      "result": {},
+      "meta": {},
+      "exception_info": {
+        "raised_exception": false,
+        "exception_traceback": null,
+        "exception_message": null
+      }
+    },
+    {
+      "success": true,
+      "expectation_config": {
+        "type": "expect_column_to_exist",
+        "kwargs": {
+          "batch_id": "mlready_product_review_stats_ds-mlready_product_review_stats_asset",
+          "column": "negative_reviews_ratio"
+        },
+        "meta": {},
+        "severity": "critical"
+      },
+      "result": {},
+      "meta": {},
+      "exception_info": {
+        "raised_exception": false,
+        "exception_traceback": null,
+        "exception_message": null
+      }
+    },
+    {
+      "success": true,
+      "expectation_config": {
+        "type": "expect_column_to_exist",
+        "kwargs": {
+          "batch_id": "mlready_product_review_stats_ds-mlready_product_review_stats_asset",
+          "column": "first_review_timestamp"
+        },
+        "meta": {},
+        "severity": "critical"
+      },
+      "result": {},
+      "meta": {},
+      "exception_info": {
+        "raised_exception": false,
+        "exception_traceback": null,
+        "exception_message": null
+      }
+    },
+    {
+      "success": true,
+      "expectation_config": {
+        "type": "expect_column_to_exist",
+        "kwargs": {
+          "batch_id": "mlready_product_review_stats_ds-mlready_product_review_stats_asset",
+          "column": "last_review_timestamp"
+        },
+        "meta": {},
+        "severity": "critical"
+      },
+      "result": {},
+      "meta": {},
+      "exception_info": {
+        "raised_exception": false,
+        "exception_traceback": null,
+        "exception_message": null
+      }
+    },
+    {
+      "success": true,
+      "expectation_config": {
+        "type": "expect_column_to_exist",
+        "kwargs": {
+          "batch_id": "mlready_product_review_stats_ds-mlready_product_review_stats_asset",
+          "column": "feature_snapshot_date"
+        },
+        "meta": {},
+        "severity": "critical"
+      },
+      "result": {},
+      "meta": {},
+      "exception_info": {
+        "raised_exception": false,
+        "exception_traceback": null,
+        "exception_message": null
+      }
+    },
+    {
+      "success": true,
+      "expectation_config": {
+        "type": "expect_column_values_to_not_be_null",
+        "kwargs": {
+          "batch_id": "mlready_product_review_stats_ds-mlready_product_review_stats_asset",
+          "column": "feature_snapshot_date"
+        },
+        "meta": {},
+        "severity": "critical"
+      },
+      "result": {
+        "element_count": 11436,
+        "unexpected_count": 0,
+        "unexpected_percent": 0.0,
+        "partial_unexpected_list": [],
+        "partial_unexpected_counts": []
+      },
+      "meta": {},
+      "exception_info": {
+        "raised_exception": false,
+        "exception_traceback": null,
+        "exception_message": null
+      }
+    },
+    {
+      "success": true,
+      "expectation_config": {
+        "type": "expect_column_values_to_not_be_null",
+        "kwargs": {
+          "batch_id": "mlready_product_review_stats_ds-mlready_product_review_stats_asset",
+          "column": "first_review_timestamp"
+        },
+        "meta": {},
+        "severity": "critical"
+      },
+      "result": {
+        "element_count": 11436,
+        "unexpected_count": 0,
+        "unexpected_percent": 0.0,
+        "partial_unexpected_list": [],
+        "partial_unexpected_counts": []
+      },
+      "meta": {},
+      "exception_info": {
+        "raised_exception": false,
+        "exception_traceback": null,
+        "exception_message": null
+      }
+    },
+    {
+      "success": true,
+      "expectation_config": {
+        "type": "expect_column_values_to_not_be_null",
+        "kwargs": {
+          "batch_id": "mlready_product_review_stats_ds-mlready_product_review_stats_asset",
+          "column": "last_review_timestamp"
+        },
+        "meta": {},
+        "severity": "critical"
+      },
+      "result": {
+        "element_count": 11436,
+        "unexpected_count": 0,
+        "unexpected_percent": 0.0,
+        "partial_unexpected_list": [],
+        "partial_unexpected_counts": []
+      },
+      "meta": {},
+      "exception_info": {
+        "raised_exception": false,
+        "exception_traceback": null,
+        "exception_message": null
+      }
+    },
+    {
+      "success": true,
+      "expectation_config": {
+        "type": "expect_column_values_to_be_between",
+        "kwargs": {
+          "batch_id": "mlready_product_review_stats_ds-mlready_product_review_stats_asset",
+          "column": "reviews_count",
+          "min_value": 1.0
+        },
+        "meta": {},
+        "severity": "critical"
+      },
+      "result": {
+        "element_count": 11436,
+        "unexpected_count": 0,
+        "unexpected_percent": 0.0,
+        "partial_unexpected_list": [],
+        "missing_count": 0,
+        "missing_percent": 0.0,
+        "unexpected_percent_total": 0.0,
+        "unexpected_percent_nonmissing": 0.0,
+        "partial_unexpected_counts": []
+      },
+      "meta": {},
+      "exception_info": {
+        "raised_exception": false,
+        "exception_traceback": null,
+        "exception_message": null
+      }
+    },
+    {
+      "success": true,
+      "expectation_config": {
+        "type": "expect_column_values_to_be_between",
+        "kwargs": {
+          "batch_id": "mlready_product_review_stats_ds-mlready_product_review_stats_asset",
+          "column": "distinct_reviewers_count",
+          "min_value": 1.0
+        },
+        "meta": {},
+        "severity": "critical"
+      },
+      "result": {
+        "element_count": 11436,
+        "unexpected_count": 0,
+        "unexpected_percent": 0.0,
+        "partial_unexpected_list": [],
+        "missing_count": 0,
+        "missing_percent": 0.0,
+        "unexpected_percent_total": 0.0,
+        "unexpected_percent_nonmissing": 0.0,
+        "partial_unexpected_counts": []
+      },
+      "meta": {},
+      "exception_info": {
+        "raised_exception": false,
+        "exception_traceback": null,
+        "exception_message": null
+      }
+    },
+    {
+      "success": true,
+      "expectation_config": {
+        "type": "expect_column_values_to_be_between",
+        "kwargs": {
+          "batch_id": "mlready_product_review_stats_ds-mlready_product_review_stats_asset",
+          "column": "avg_rating",
+          "min_value": 1.0,
+          "max_value": 5.0
+        },
+        "meta": {},
+        "severity": "critical"
+      },
+      "result": {
+        "element_count": 11436,
+        "unexpected_count": 0,
+        "unexpected_percent": 0.0,
+        "partial_unexpected_list": [],
+        "missing_count": 0,
+        "missing_percent": 0.0,
+        "unexpected_percent_total": 0.0,
+        "unexpected_percent_nonmissing": 0.0,
+        "partial_unexpected_counts": []
+      },
+      "meta": {},
+      "exception_info": {
+        "raised_exception": false,
+        "exception_traceback": null,
+        "exception_message": null
+      }
+    },
+    {
+      "success": true,
+      "expectation_config": {
+        "type": "expect_column_values_to_be_between",
+        "kwargs": {
+          "batch_id": "mlready_product_review_stats_ds-mlready_product_review_stats_asset",
+          "column": "rating_stddev",
+          "min_value": 0.0
+        },
+        "meta": {},
+        "severity": "critical"
+      },
+      "result": {
+        "element_count": 11436,
+        "unexpected_count": 0,
+        "unexpected_percent": 0.0,
+        "partial_unexpected_list": [],
+        "missing_count": 0,
+        "missing_percent": 0.0,
+        "unexpected_percent_total": 0.0,
+        "unexpected_percent_nonmissing": 0.0,
+        "partial_unexpected_counts": []
+      },
+      "meta": {},
+      "exception_info": {
+        "raised_exception": false,
+        "exception_traceback": null,
+        "exception_message": null
+      }
+    },
+    {
+      "success": true,
+      "expectation_config": {
+        "type": "expect_column_values_to_be_between",
+        "kwargs": {
+          "batch_id": "mlready_product_review_stats_ds-mlready_product_review_stats_asset",
+          "column": "verified_reviews_ratio",
+          "min_value": 0.0,
+          "max_value": 1.0
+        },
+        "meta": {},
+        "severity": "critical"
+      },
+      "result": {
+        "element_count": 11436,
+        "unexpected_count": 0,
+        "unexpected_percent": 0.0,
+        "partial_unexpected_list": [],
+        "missing_count": 0,
+        "missing_percent": 0.0,
+        "unexpected_percent_total": 0.0,
+        "unexpected_percent_nonmissing": 0.0,
+        "partial_unexpected_counts": []
+      },
+      "meta": {},
+      "exception_info": {
+        "raised_exception": false,
+        "exception_traceback": null,
+        "exception_message": null
+      }
+    },
+    {
+      "success": true,
+      "expectation_config": {
+        "type": "expect_column_values_to_be_between",
+        "kwargs": {
+          "batch_id": "mlready_product_review_stats_ds-mlready_product_review_stats_asset",
+          "column": "avg_vote_count",
+          "min_value": 0.0
+        },
+        "meta": {},
+        "severity": "critical"
+      },
+      "result": {
+        "element_count": 11436,
+        "unexpected_count": 0,
+        "unexpected_percent": 0.0,
+        "partial_unexpected_list": [],
+        "missing_count": 0,
+        "missing_percent": 0.0,
+        "unexpected_percent_total": 0.0,
+        "unexpected_percent_nonmissing": 0.0,
+        "partial_unexpected_counts": []
+      },
+      "meta": {},
+      "exception_info": {
+        "raised_exception": false,
+        "exception_traceback": null,
+        "exception_message": null
+      }
+    },
+    {
+      "success": true,
+      "expectation_config": {
+        "type": "expect_column_values_to_be_between",
+        "kwargs": {
+          "batch_id": "mlready_product_review_stats_ds-mlready_product_review_stats_asset",
+          "column": "avg_review_text_length",
+          "min_value": 0.0
+        },
+        "meta": {},
+        "severity": "critical"
+      },
+      "result": {
+        "element_count": 11436,
+        "unexpected_count": 0,
+        "unexpected_percent": 0.0,
+        "partial_unexpected_list": [],
+        "missing_count": 0,
+        "missing_percent": 0.0,
+        "unexpected_percent_total": 0.0,
+        "unexpected_percent_nonmissing": 0.0,
+        "partial_unexpected_counts": []
+      },
+      "meta": {},
+      "exception_info": {
+        "raised_exception": false,
+        "exception_traceback": null,
+        "exception_message": null
+      }
+    },
+    {
+      "success": true,
+      "expectation_config": {
+        "type": "expect_column_values_to_be_between",
+        "kwargs": {
+          "batch_id": "mlready_product_review_stats_ds-mlready_product_review_stats_asset",
+          "column": "positive_reviews_ratio",
+          "min_value": 0.0,
+          "max_value": 1.0
+        },
+        "meta": {},
+        "severity": "critical"
+      },
+      "result": {
+        "element_count": 11436,
+        "unexpected_count": 0,
+        "unexpected_percent": 0.0,
+        "partial_unexpected_list": [],
+        "missing_count": 0,
+        "missing_percent": 0.0,
+        "unexpected_percent_total": 0.0,
+        "unexpected_percent_nonmissing": 0.0,
+        "partial_unexpected_counts": []
+      },
+      "meta": {},
+      "exception_info": {
+        "raised_exception": false,
+        "exception_traceback": null,
+        "exception_message": null
+      }
+    },
+    {
+      "success": true,
+      "expectation_config": {
+        "type": "expect_column_values_to_be_between",
+        "kwargs": {
+          "batch_id": "mlready_product_review_stats_ds-mlready_product_review_stats_asset",
+          "column": "negative_reviews_ratio",
+          "min_value": 0.0,
+          "max_value": 1.0
+        },
+        "meta": {},
+        "severity": "critical"
+      },
+      "result": {
+        "element_count": 11436,
+        "unexpected_count": 0,
+        "unexpected_percent": 0.0,
+        "partial_unexpected_list": [],
+        "missing_count": 0,
+        "missing_percent": 0.0,
+        "unexpected_percent_total": 0.0,
+        "unexpected_percent_nonmissing": 0.0,
+        "partial_unexpected_counts": []
+      },
+      "meta": {},
+      "exception_info": {
+        "raised_exception": false,
+        "exception_traceback": null,
+        "exception_message": null
+      }
+    }
+  ]
+}

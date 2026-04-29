@@ -67,7 +67,7 @@ def build_text_for_embedding(
     return None
 
 
-def load_embedding_model(model_name: str) -> SentenceTransformer:
+def load_embedding_model(model_name: str):
     """
     Load and return a Sentence-Transformers model.
 

@@ -306,7 +306,13 @@ with DAG(
         job_driver={
             "sparkSubmit": {
                 "entryPoint": GENERATE_REVIEW_EMBEDDINGS_SCRIPT,
-                "sparkSubmitParameters": f"--py-files {PY_FILES_S3_URI}",
+                "sparkSubmitParameters": (
+                    f"--py-files {PY_FILES_S3_URI} "
+                    "--conf spark.archives=s3://project-3-recommender-system/artifacts/environment.tar.gz#environment "
+                    "--conf spark.emr-serverless.driverEnv.PYSPARK_PYTHON=./environment/bin/python "
+                    "--conf spark.executorEnv.PYSPARK_PYTHON=./environment/bin/python "
+                    "--conf spark.sql.execution.arrow.pyspark.enabled=true"
+                ),
             }
         },
         configuration_overrides=COMMON_CONFIGURATION_OVERRIDES,

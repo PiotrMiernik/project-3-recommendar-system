@@ -107,7 +107,7 @@ data "aws_iam_policy_document" "s3_emr_serverless_runtime" {
     resources = ["arn:aws:s3:::${var.s3_bucket_name}"]
   }
 
-  # Read access for Raw, Staging AND Spark Scripts
+  # Read access for Raw, Staging, Spark Scripts and embedding libraries
   statement {
     sid       = "ReadInputAndScripts"
     effect    = "Allow"
@@ -115,7 +115,8 @@ data "aws_iam_policy_document" "s3_emr_serverless_runtime" {
     resources = [
       "arn:aws:s3:::${var.s3_bucket_name}/raw/*",
       "arn:aws:s3:::${var.s3_bucket_name}/staging/*",
-      "arn:aws:s3:::${var.s3_bucket_name}/jobs/*"
+      "arn:aws:s3:::${var.s3_bucket_name}/jobs/*",
+      "arn:aws:s3:::${var.s3_bucket_name}/artifacts/*",
     ]
   }
 

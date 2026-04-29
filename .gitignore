@@ -31,3 +31,6 @@ airflow_home/
 .venv/
 __pycache__/
 *.db
+
+# EMR artifacts
+environment.tar.gz

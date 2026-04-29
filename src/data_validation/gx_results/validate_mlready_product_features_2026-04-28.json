@@ -1,0 +1,415 @@
+{
+  "entity": "product_features",
+  "execution_date": "2026-04-28",
+  "table_name": "glue_catalog.mlready.product_features",
+  "success": true,
+  "expectations": [
+    {
+      "success": true,
+      "expectation_config": {
+        "type": "expect_column_values_to_not_be_null",
+        "kwargs": {
+          "batch_id": "mlready_product_features_ds-mlready_product_features_asset",
+          "column": "asin"
+        },
+        "meta": {},
+        "severity": "critical"
+      },
+      "result": {
+        "element_count": 89891,
+        "unexpected_count": 0,
+        "unexpected_percent": 0.0,
+        "partial_unexpected_list": [],
+        "partial_unexpected_counts": []
+      },
+      "meta": {},
+      "exception_info": {
+        "raised_exception": false,
+        "exception_traceback": null,
+        "exception_message": null
+      }
+    },
+    {
+      "success": true,
+      "expectation_config": {
+        "type": "expect_column_values_to_be_unique",
+        "kwargs": {
+          "batch_id": "mlready_product_features_ds-mlready_product_features_asset",
+          "column": "asin"
+        },
+        "meta": {},
+        "severity": "critical"
+      },
+      "result": {
+        "element_count": 89891,
+        "unexpected_count": 0,
+        "unexpected_percent": 0.0,
+        "partial_unexpected_list": [],
+        "missing_count": 0,
+        "missing_percent": 0.0,
+        "unexpected_percent_total": 0.0,
+        "unexpected_percent_nonmissing": 0.0,
+        "partial_unexpected_counts": []
+      },
+      "meta": {},
+      "exception_info": {
+        "raised_exception": false,
+        "exception_traceback": null,
+        "exception_message": null
+      }
+    },
+    {
+      "success": true,
+      "expectation_config": {
+        "type": "expect_column_to_exist",
+        "kwargs": {
+          "batch_id": "mlready_product_features_ds-mlready_product_features_asset",
+          "column": "title"
+        },
+        "meta": {},
+        "severity": "critical"
+      },
+      "result": {},
+      "meta": {},
+      "exception_info": {
+        "raised_exception": false,
+        "exception_traceback": null,
+        "exception_message": null
+      }
+    },
+    {
+      "success": true,
+      "expectation_config": {
+        "type": "expect_column_to_exist",
+        "kwargs": {
+          "batch_id": "mlready_product_features_ds-mlready_product_features_asset",
+          "column": "brand"
+        },
+        "meta": {},
+        "severity": "critical"
+      },
+      "result": {},
+      "meta": {},
+      "exception_info": {
+        "raised_exception": false,
+        "exception_traceback": null,
+        "exception_message": null
+      }
+    },
+    {
+      "success": true,
+      "expectation_config": {
+        "type": "expect_column_to_exist",
+        "kwargs": {
+          "batch_id": "mlready_product_features_ds-mlready_product_features_asset",
+          "column": "main_category"
+        },
+        "meta": {},
+        "severity": "critical"
+      },
+      "result": {},
+      "meta": {},
+      "exception_info": {
+        "raised_exception": false,
+        "exception_traceback": null,
+        "exception_message": null
+      }
+    },
+    {
+      "success": true,
+      "expectation_config": {
+        "type": "expect_column_to_exist",
+        "kwargs": {
+          "batch_id": "mlready_product_features_ds-mlready_product_features_asset",
+          "column": "price"
+        },
+        "meta": {},
+        "severity": "critical"
+      },
+      "result": {},
+      "meta": {},
+      "exception_info": {
+        "raised_exception": false,
+        "exception_traceback": null,
+        "exception_message": null
+      }
+    },
+    {
+      "success": true,
+      "expectation_config": {
+        "type": "expect_column_to_exist",
+        "kwargs": {
+          "batch_id": "mlready_product_features_ds-mlready_product_features_asset",
+          "column": "has_brand"
+        },
+        "meta": {},
+        "severity": "critical"
+      },
+      "result": {},
+      "meta": {},
+      "exception_info": {
+        "raised_exception": false,
+        "exception_traceback": null,
+        "exception_message": null
+      }
+    },
+    {
+      "success": true,
+      "expectation_config": {
+        "type": "expect_column_to_exist",
+        "kwargs": {
+          "batch_id": "mlready_product_features_ds-mlready_product_features_asset",
+          "column": "has_price"
+        },
+        "meta": {},
+        "severity": "critical"
+      },
+      "result": {},
+      "meta": {},
+      "exception_info": {
+        "raised_exception": false,
+        "exception_traceback": null,
+        "exception_message": null
+      }
+    },
+    {
+      "success": true,
+      "expectation_config": {
+        "type": "expect_column_to_exist",
+        "kwargs": {
+          "batch_id": "mlready_product_features_ds-mlready_product_features_asset",
+          "column": "title_length"
+        },
+        "meta": {},
+        "severity": "critical"
+      },
+      "result": {},
+      "meta": {},
+      "exception_info": {
+        "raised_exception": false,
+        "exception_traceback": null,
+        "exception_message": null
+      }
+    },
+    {
+      "success": true,
+      "expectation_config": {
+        "type": "expect_column_to_exist",
+        "kwargs": {
+          "batch_id": "mlready_product_features_ds-mlready_product_features_asset",
+          "column": "description_total_length"
+        },
+        "meta": {},
+        "severity": "critical"
+      },
+      "result": {},
+      "meta": {},
+      "exception_info": {
+        "raised_exception": false,
+        "exception_traceback": null,
+        "exception_message": null
+      }
+    },
+    {
+      "success": true,
+      "expectation_config": {
+        "type": "expect_column_to_exist",
+        "kwargs": {
+          "batch_id": "mlready_product_features_ds-mlready_product_features_asset",
+          "column": "feature_snapshot_date"
+        },
+        "meta": {},
+        "severity": "critical"
+      },
+      "result": {},
+      "meta": {},
+      "exception_info": {
+        "raised_exception": false,
+        "exception_traceback": null,
+        "exception_message": null
+      }
+    },
+    {
+      "success": true,
+      "expectation_config": {
+        "type": "expect_column_values_to_not_be_null",
+        "kwargs": {
+          "batch_id": "mlready_product_features_ds-mlready_product_features_asset",
+          "column": "feature_snapshot_date"
+        },
+        "meta": {},
+        "severity": "critical"
+      },
+      "result": {
+        "element_count": 89891,
+        "unexpected_count": 0,
+        "unexpected_percent": 0.0,
+        "partial_unexpected_list": [],
+        "partial_unexpected_counts": []
+      },
+      "meta": {},
+      "exception_info": {
+        "raised_exception": false,
+        "exception_traceback": null,
+        "exception_message": null
+      }
+    },
+    {
+      "success": true,
+      "expectation_config": {
+        "type": "expect_column_values_to_be_between",
+        "kwargs": {
+          "batch_id": "mlready_product_features_ds-mlready_product_features_asset",
+          "column": "title_length",
+          "min_value": 0.0
+        },
+        "meta": {},
+        "severity": "critical"
+      },
+      "result": {
+        "element_count": 89891,
+        "unexpected_count": 0,
+        "unexpected_percent": 0.0,
+        "partial_unexpected_list": [],
+        "missing_count": 0,
+        "missing_percent": 0.0,
+        "unexpected_percent_total": 0.0,
+        "unexpected_percent_nonmissing": 0.0,
+        "partial_unexpected_counts": []
+      },
+      "meta": {},
+      "exception_info": {
+        "raised_exception": false,
+        "exception_traceback": null,
+        "exception_message": null
+      }
+    },
+    {
+      "success": true,
+      "expectation_config": {
+        "type": "expect_column_values_to_be_between",
+        "kwargs": {
+          "batch_id": "mlready_product_features_ds-mlready_product_features_asset",
+          "column": "description_total_length",
+          "min_value": 0.0
+        },
+        "meta": {},
+        "severity": "critical"
+      },
+      "result": {
+        "element_count": 89891,
+        "unexpected_count": 0,
+        "unexpected_percent": 0.0,
+        "partial_unexpected_list": [],
+        "missing_count": 0,
+        "missing_percent": 0.0,
+        "unexpected_percent_total": 0.0,
+        "unexpected_percent_nonmissing": 0.0,
+        "partial_unexpected_counts": []
+      },
+      "meta": {},
+      "exception_info": {
+        "raised_exception": false,
+        "exception_traceback": null,
+        "exception_message": null
+      }
+    },
+    {
+      "success": true,
+      "expectation_config": {
+        "type": "expect_column_values_to_be_between",
+        "kwargs": {
+          "batch_id": "mlready_product_features_ds-mlready_product_features_asset",
+          "column": "price",
+          "mostly": 0.95,
+          "min_value": 0.0
+        },
+        "meta": {},
+        "severity": "warning"
+      },
+      "result": {
+        "element_count": 89891,
+        "unexpected_count": 0,
+        "unexpected_percent": 0.0,
+        "partial_unexpected_list": [],
+        "missing_count": 54848,
+        "missing_percent": 61.01611952253284,
+        "unexpected_percent_total": 0.0,
+        "unexpected_percent_nonmissing": 0.0,
+        "partial_unexpected_counts": []
+      },
+      "meta": {},
+      "exception_info": {
+        "raised_exception": false,
+        "exception_traceback": null,
+        "exception_message": null
+      }
+    },
+    {
+      "success": true,
+      "expectation_config": {
+        "type": "expect_column_values_to_be_in_set",
+        "kwargs": {
+          "batch_id": "mlready_product_features_ds-mlready_product_features_asset",
+          "column": "has_brand",
+          "value_set": [
+            true,
+            false
+          ]
+        },
+        "meta": {},
+        "severity": "critical"
+      },
+      "result": {
+        "element_count": 89891,
+        "unexpected_count": 0,
+        "unexpected_percent": 0.0,
+        "partial_unexpected_list": [],
+        "missing_count": 0,
+        "missing_percent": 0.0,
+        "unexpected_percent_total": 0.0,
+        "unexpected_percent_nonmissing": 0.0,
+        "partial_unexpected_counts": []
+      },
+      "meta": {},
+      "exception_info": {
+        "raised_exception": false,
+        "exception_traceback": null,
+        "exception_message": null
+      }
+    },
+    {
+      "success": true,
+      "expectation_config": {
+        "type": "expect_column_values_to_be_in_set",
+        "kwargs": {
+          "batch_id": "mlready_product_features_ds-mlready_product_features_asset",
+          "column": "has_price",
+          "value_set": [
+            true,
+            false
+          ]
+        },
+        "meta": {},
+        "severity": "critical"
+      },
+      "result": {
+        "element_count": 89891,
+        "unexpected_count": 0,
+        "unexpected_percent": 0.0,
+        "partial_unexpected_list": [],
+        "missing_count": 0,
+        "missing_percent": 0.0,
+        "unexpected_percent_total": 0.0,
+        "unexpected_percent_nonmissing": 0.0,
+        "partial_unexpected_counts": []
+      },
+      "meta": {},
+      "exception_info": {
+        "raised_exception": false,
+        "exception_traceback": null,
+        "exception_message": null
+      }
+    }
+  ]
+}

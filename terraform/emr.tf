@@ -19,20 +19,47 @@ resource "aws_emrserverless_application" "spark" {
     enabled = true
   }
 
-  # Shutdown application after 1 minute of inactivity to save costs
+  # Shutdown application after 15 minute of inactivity to save costs
   auto_stop_configuration {
     enabled              = true
-    idle_timeout_minutes = 1 
+    idle_timeout_minutes = 15 
   }
 
-  # Conservative resource limits for initial runs
+  # Initial Capacity: Pre-provisions resources to ensure workers are ready immediately
+  # and have specific hardware configurations (like large enough disks for ML environments)
+  initial_capacity {
+    initial_capacity_type = "Driver"
+    initial_capacity_config {
+      worker_count = 1
+      worker_configuration {
+        cpu    = "4 vCPU"
+        memory = "16 GB"
+        disk   = "20 GB"
+      }
+    }
+  }
+
+  initial_capacity {
+    initial_capacity_type = "Executor"
+    initial_capacity_config {
+      worker_count = 2 # Two executors to process data in parallel
+      worker_configuration {
+        cpu    = "4 vCPU"
+        memory = "16 GB"
+        disk   = "20 GB"
+      }
+    }
+  }
+
+  # Maximum Capacity: The absolute ceiling for the entire application across all concurrent jobs
+  # Prevents runaway costs if multiple jobs are triggered or if auto-scaling goes too far
   maximum_capacity {
     cpu    = "20 vCPU"
     memory = "80 GB"
     disk   = "200 GB"
   }
 
-  # Enable S3 logging for job debugging
+  # Monitoring: Routes all Spark stdout, stderr, and event logs to S3 for debugging
   monitoring_configuration {
     s3_monitoring_configuration {
       log_uri = "s3://${aws_s3_bucket.data_lake.bucket}/logs/emr-serverless/"
