@@ -34,3 +34,7 @@ __pycache__/
 
 # EMR artifacts
 environment.tar.gz
+
+.venv_emr_embeddings/
+environment.tar.gz
+src_package.zip

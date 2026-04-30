@@ -37,7 +37,7 @@ default_args = {
     "depends_on_past": False,
     "email_on_failure": False,
     "email_on_retry": False,
-    "retries": 1,
+    "retries": 0,
     "retry_delay": timedelta(minutes=2),
 }
 
@@ -303,14 +303,23 @@ with DAG(
         task_id="generate_review_embeddings",
         application_id=EMR_SERVERLESS_APPLICATION_ID,
         execution_role_arn=EMR_SERVERLESS_EXECUTION_ROLE_ARN,
+        wait_for_completion=True,
         job_driver={
             "sparkSubmit": {
                 "entryPoint": GENERATE_REVIEW_EMBEDDINGS_SCRIPT,
                 "sparkSubmitParameters": (
                     f"--py-files {PY_FILES_S3_URI} "
-                    "--conf spark.archives=s3://project-3-recommender-system/artifacts/environment.tar.gz#environment "
+                    "--archives s3://project-3-recommender-system/artifacts/environment.tar.gz#environment "
+                    "--conf spark.pyspark.python=./environment/bin/python "
+                    "--conf spark.pyspark.driver.python=./environment/bin/python "
                     "--conf spark.emr-serverless.driverEnv.PYSPARK_PYTHON=./environment/bin/python "
+                    "--conf spark.emr-serverless.driverEnv.PYSPARK_DRIVER_PYTHON=./environment/bin/python "
                     "--conf spark.executorEnv.PYSPARK_PYTHON=./environment/bin/python "
+                    "--conf spark.executorEnv.PYSPARK_DRIVER_PYTHON=./environment/bin/python "
+                    "--conf spark.emr-serverless.driverEnv.PYTHONPATH=./environment/lib/python3.12/site-packages "
+                    "--conf spark.executorEnv.PYTHONPATH=./environment/lib/python3.12/site-packages "
+                    "--conf spark.executor.instances=2 "
+                    "--conf spark.dynamicAllocation.enabled=false "
                     "--conf spark.sql.execution.arrow.pyspark.enabled=true"
                 ),
             }

@@ -34,7 +34,7 @@ resource "aws_emrserverless_application" "spark" {
       worker_configuration {
         cpu    = "4 vCPU"
         memory = "16 GB"
-        disk   = "20 GB"
+        disk   = "100 GB"
       }
     }
   }
@@ -46,7 +46,7 @@ resource "aws_emrserverless_application" "spark" {
       worker_configuration {
         cpu    = "4 vCPU"
         memory = "16 GB"
-        disk   = "20 GB"
+        disk   = "100 GB"
       }
     }
   }
@@ -56,7 +56,7 @@ resource "aws_emrserverless_application" "spark" {
   maximum_capacity {
     cpu    = "20 vCPU"
     memory = "80 GB"
-    disk   = "200 GB"
+    disk   = "300 GB"
   }
 
   # Monitoring: Routes all Spark stdout, stderr, and event logs to S3 for debugging

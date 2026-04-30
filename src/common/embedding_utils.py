@@ -16,7 +16,6 @@ import html
 import re
 from typing import List, Optional, Sequence
 
-import numpy as np
 
 def clean_text(text: Optional[str]) -> Optional[str]:
     """
@@ -113,6 +112,8 @@ def normalize_embeddings(vectors: List[List[float]]) -> List[List[float]]:
 
     Zero vectors are returned unchanged to avoid division by zero.
     """
+    import numpy as np
+
     if not vectors:
         return []
 
