@@ -12,8 +12,7 @@ COPY requirements-embeddings.txt /tmp/requirements-embeddings.txt
 
 # 5. Install Python libraries using the EMR Python interpreter
 # --no-cache-dir reduces image size by not storing the installer files
-RUN python3 -m pip install --upgrade pip && \
-    python3 -m pip install --no-cache-dir -r /tmp/requirements-embeddings.txt
+RUN python3 -m pip install --no-cache-dir -r /tmp/requirements-embeddings.txt
 
 # 6. Set environment variables to ensure Spark uses the correct Python paths
 ENV PYSPARK_PYTHON=/usr/bin/python3

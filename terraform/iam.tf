@@ -4,7 +4,9 @@
 
 data "aws_caller_identity" "current" {}
 
+# =============================================================================
 # 1. ORCHESTRATOR ROLE (For Local Airflow)
+# =============================================================================
 
 data "aws_iam_policy_document" "orchestrator_assume" {
   statement {
@@ -80,7 +82,9 @@ resource "aws_iam_role_policy_attachment" "orchestrator_attach" {
   policy_arn = aws_iam_policy.orchestrator_policy.arn
 }
 
+# =============================================================================
 # 2. EMR SERVERLESS RUNTIME ROLE (For Spark Execution)
+# =============================================================================
 
 data "aws_iam_policy_document" "emr_serverless_runtime_assume" {
   statement {
@@ -98,7 +102,9 @@ resource "aws_iam_role" "emr_serverless_runtime_role" {
   assume_role_policy = data.aws_iam_policy_document.emr_serverless_runtime_assume.json
 }
 
-data "aws_iam_policy_document" "s3_emr_serverless_runtime" {
+# --- S3 & GLUE ACCESS POLICY ---
+
+data "aws_iam_policy_document" "s3_glue_runtime_policy" {
   # List Bucket for S3 connectivity
   statement {
     sid       = "ListBucket"
@@ -107,7 +113,7 @@ data "aws_iam_policy_document" "s3_emr_serverless_runtime" {
     resources = ["arn:aws:s3:::${var.s3_bucket_name}"]
   }
 
-  # Read access for Raw, Staging, Spark Scripts and embedding libraries
+  # Read access for Raw, Staging, Spark Scripts and artifacts
   statement {
     sid       = "ReadInputAndScripts"
     effect    = "Allow"
@@ -121,7 +127,6 @@ data "aws_iam_policy_document" "s3_emr_serverless_runtime" {
   }
 
   # Write access for Staging, MLReady and Logs
-  # Note: GetObject is also needed for MLReady to handle Iceberg metadata operations
   statement {
     sid    = "WriteOutputAndLogs"
     effect = "Allow"
@@ -165,12 +170,46 @@ data "aws_iam_policy_document" "s3_emr_serverless_runtime" {
   }
 }
 
-resource "aws_iam_policy" "s3_emr_serverless_runtime" {
-  name   = "project3-s3-emr-serverless-runtime-policy"
-  policy = data.aws_iam_policy_document.s3_emr_serverless_runtime.json
+resource "aws_iam_policy" "s3_glue_runtime" {
+  name   = "project3-s3-glue-runtime-policy"
+  policy = data.aws_iam_policy_document.s3_glue_runtime_policy.json
 }
 
-resource "aws_iam_role_policy_attachment" "emr_serverless_runtime_s3_attach" {
+resource "aws_iam_role_policy_attachment" "emr_runtime_s3_glue_attach" {
   role       = aws_iam_role.emr_serverless_runtime_role.name
-  policy_arn = aws_iam_policy.s3_emr_serverless_runtime.arn
+  policy_arn = aws_iam_policy.s3_glue_runtime.arn
+}
+
+# --- ECR ACCESS POLICY (New: Required for Custom Docker Images) ---
+
+data "aws_iam_policy_document" "ecr_runtime_policy" {
+  # Required permissions for EMR Serverless to pull the custom image from ECR
+  statement {
+    sid    = "ECRReadAccess"
+    effect = "Allow"
+    actions = [
+      "ecr:BatchCheckLayerAvailability",
+      "ecr:GetDownloadUrlForLayer",
+      "ecr:BatchGetImage"
+    ]
+    resources = [aws_ecr_repository.recommender_embeddings.arn]
+  }
+
+  # GetAuthorizationToken is a global action and doesn't support resource-level permissions
+  statement {
+    sid       = "ECRAuthToken"
+    effect    = "Allow"
+    actions   = ["ecr:GetAuthorizationToken"]
+    resources = ["*"]
+  }
+}
+
+resource "aws_iam_policy" "ecr_runtime_policy" {
+  name   = "project3-ecr-runtime-policy"
+  policy = data.aws_iam_policy_document.ecr_runtime_policy.json
+}
+
+resource "aws_iam_role_policy_attachment" "emr_runtime_ecr_attach" {
+  role       = aws_iam_role.emr_serverless_runtime_role.name
+  policy_arn = aws_iam_policy.ecr_runtime_policy.arn
 }

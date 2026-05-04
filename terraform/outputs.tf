@@ -36,3 +36,8 @@ output "emr_serverless_application_id" {
   description = "ID of the EMR Serverless Application"
   value       = aws_emrserverless_application.spark.id
 }
+
+# ECR repository url
+output "ecr_repository_url" {
+  value = aws_ecr_repository.recommender_embeddings.repository_url
+}
