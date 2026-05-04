@@ -33,7 +33,9 @@ __pycache__/
 *.db
 
 # EMR artifacts
-environment.tar.gz
+*.tar
+*.tar.gz
+
 
 .venv_emr_embeddings/
 environment.tar.gz
