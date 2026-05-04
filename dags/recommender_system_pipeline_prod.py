@@ -3,25 +3,10 @@
 # caused by heavy ML libraries (torch, sentence-transformers) or database drivers.
 # The entire pipeline is executed sequentially to avoid EMR/Spark resource contention.
 #
-# Flow:
-# 1. Ingest products to S3 Raw
-# 2. Transform products Raw -> Staging on EMR Serverless
-# 3. Validate staging products locally with Great Expectations
-# 4. Ingest reviews to S3 Raw
-# 5. Transform reviews Raw -> Staging on EMR Serverless
-# 6. Validate staging reviews locally with Great Expectations
-# 7. Build mlready product_features on EMR Serverless
-# 8. Validate mlready product_features locally with Great Expectations
-# 9. Build mlready user_features on EMR Serverless
-# 10. Validate mlready user_features locally with Great Expectations
-# 11. Build mlready product_review_stats on EMR Serverless
-# 12. Validate mlready product_review_stats locally with Great Expectations
-# 13. Build mlready user_product_interactions on EMR Serverless
-# 14. Validate mlready user_product_interactions locally with Great Expectations
-# 15. Prepare and filter reviews for embedding generation on EMR Serverless
-# 16. Generate review embeddings on EMR Serverless
-# 17. Load review embeddings into pgvector locally
-# 18. Validate pgvector review embeddings locally with SQL-based checks
+# Changes:
+# - Switched from .tar.gz environment to native ECR Docker Image support.
+# - Optimized resource allocation (CPU/RAM) for heavy ML embedding tasks.
+# - Cleaned up Spark parameters by removing redundant environment paths.
 
 from datetime import datetime, timedelta
 from airflow import DAG
@@ -29,7 +14,7 @@ from airflow.operators.empty import EmptyOperator
 from airflow.operators.python import PythonOperator
 from airflow.providers.amazon.aws.operators.emr import EmrServerlessStartJobOperator
 
-# We keep lightweight utility imports at the top
+# Lightweight utility imports
 from src.common.s3_utils import build_manifest_key
 
 default_args = {
@@ -41,13 +26,13 @@ default_args = {
     "retry_delay": timedelta(minutes=2),
 }
 
-# IMPROVEMENT 1: Use Jinja templates for Airflow Variables.
-# This prevents the Scheduler from hitting the Metadata DB every time it parses the file.
+# Airflow Variables via Jinja templates to prevent DB thrashing
 EMR_SERVERLESS_APPLICATION_ID = "{{ var.value.emr_serverless_application_id }}"
 EMR_SERVERLESS_EXECUTION_ROLE_ARN = "{{ var.value.emr_serverless_runtime_role_arn }}"
 
 AWS_CONN_ID = "aws_default"
 S3_BUCKET = "project-3-recommender-system"
+ECR_IMAGE_URI = "524501562188.dkr.ecr.eu-central-1.amazonaws.com/recommender-embeddings:latest"
 
 # S3 Path configurations
 PRODUCTS_SCRIPT_S3_URI = f"s3://{S3_BUCKET}/jobs/transform_raw_products_to_staging.py"
@@ -62,6 +47,7 @@ GENERATE_REVIEW_EMBEDDINGS_SCRIPT = f"s3://{S3_BUCKET}/jobs/step2_generate_revie
 PY_FILES_S3_URI = f"s3://{S3_BUCKET}/jobs/src_package.zip"
 EMR_LOGS_S3_URI = f"s3://{S3_BUCKET}/logs/emr-serverless/"
 
+# Global configuration for EMR Serverless jobs
 COMMON_CONFIGURATION_OVERRIDES = {
     "monitoringConfiguration": {
         "s3MonitoringConfiguration": {
@@ -90,10 +76,12 @@ COMMON_CONFIGURATION_OVERRIDES = {
             },
         }
     ],
+    "imageConfiguration": {
+        "imageUri": ECR_IMAGE_URI
+    }
 }
 
-# IMPROVEMENT 2: Wrapper functions for Lazy Loading.
-# These functions import logic only when the task is executed on the worker.
+# --- Lazy Loading Wrapper Functions ---
 
 def ingest_products_wrapper(**kwargs):
     from src.ingestion.ingest_products_to_s3_raw import main
@@ -138,17 +126,17 @@ def validate_pgvector_wrapper(**kwargs):
 
 with DAG(
     dag_id="recommender_system_pipeline_prod",
-    description="Production orchestration DAG for the recommender system project",
+    description="Production orchestration DAG for Project 3",
     default_args=default_args,
     start_date=datetime(2026, 3, 23),
     schedule=None,
     catchup=False,
-    tags=["project3", "recommender", "pipeline", "prod", "emr-serverless"],
+    tags=["project3", "recommender", "pipeline", "prod", "emr-serverless", "ecr-image"],
 ) as dag:
 
     start = EmptyOperator(task_id="start")
 
-    # PHASE 1: Products
+    # PHASE 1: Products Ingestion and Transformation
     ingest_products = PythonOperator(
         task_id="ingest_products_to_s3_raw",
         python_callable=ingest_products_wrapper,
@@ -159,7 +147,6 @@ with DAG(
         application_id=EMR_SERVERLESS_APPLICATION_ID,
         execution_role_arn=EMR_SERVERLESS_EXECUTION_ROLE_ARN,
         aws_conn_id=AWS_CONN_ID,
-        wait_for_completion=True,
         job_driver={
             "sparkSubmit": {
                 "entryPoint": PRODUCTS_SCRIPT_S3_URI,
@@ -176,7 +163,7 @@ with DAG(
         op_kwargs={"ingest_dt": "{{ ds }}"},
     )
 
-    # PHASE 1: Reviews
+    # PHASE 1: Reviews Ingestion and Transformation
     ingest_reviews = PythonOperator(
         task_id="ingest_reviews_to_s3_raw",
         python_callable=ingest_reviews_wrapper,
@@ -187,7 +174,6 @@ with DAG(
         application_id=EMR_SERVERLESS_APPLICATION_ID,
         execution_role_arn=EMR_SERVERLESS_EXECUTION_ROLE_ARN,
         aws_conn_id=AWS_CONN_ID,
-        wait_for_completion=True,
         job_driver={
             "sparkSubmit": {
                 "entryPoint": REVIEWS_SCRIPT_S3_URI,
@@ -204,7 +190,7 @@ with DAG(
         op_kwargs={"ingest_dt": "{{ ds }}"},
     )
 
-    # PHASE 2-5: MLReady Features
+    # PHASE 2-5: Building ML-Ready Feature Sets
     build_mlready_product_features = EmrServerlessStartJobOperator(
         task_id="build_mlready_product_features",
         application_id=EMR_SERVERLESS_APPLICATION_ID,
@@ -219,6 +205,7 @@ with DAG(
         configuration_overrides=COMMON_CONFIGURATION_OVERRIDES,
     )
 
+    # (Validation tasks for MLReady features remain as PythonOperators)
     validate_mlready_product_features = PythonOperator(
         task_id="validate_mlready_product_features",
         python_callable=validate_mlready_product_features_wrapper,
@@ -285,7 +272,7 @@ with DAG(
         op_kwargs={"execution_date": "{{ ds }}"},
     )
 
-    # PHASE 6: Embedding Pipeline
+    # PHASE 6: Embedding Pipeline - CORE ML WORKLOAD
     prepare_and_filter_reviews_for_embeddings = EmrServerlessStartJobOperator(
         task_id="prepare_and_filter_reviews_for_embeddings",
         application_id=EMR_SERVERLESS_APPLICATION_ID,
@@ -309,15 +296,12 @@ with DAG(
                 "entryPoint": GENERATE_REVIEW_EMBEDDINGS_SCRIPT,
                 "sparkSubmitParameters": (
                     f"--py-files {PY_FILES_S3_URI} "
-                    "--archives s3://project-3-recommender-system/artifacts/environment.tar.gz#environment "
-                    "--conf spark.pyspark.python=./environment/bin/python "
-                    "--conf spark.pyspark.driver.python=./environment/bin/python "
-                    "--conf spark.emr-serverless.driverEnv.PYSPARK_PYTHON=./environment/bin/python "
-                    "--conf spark.emr-serverless.driverEnv.PYSPARK_DRIVER_PYTHON=./environment/bin/python "
-                    "--conf spark.executorEnv.PYSPARK_PYTHON=./environment/bin/python "
-                    "--conf spark.executorEnv.PYSPARK_DRIVER_PYTHON=./environment/bin/python "
-                    "--conf spark.emr-serverless.driverEnv.PYTHONPATH=./environment/lib/python3.12/site-packages "
-                    "--conf spark.executorEnv.PYTHONPATH=./environment/lib/python3.12/site-packages "
+                    # Optimized resource allocation for ML models (SentenceTransformers/Torch)
+                    "--conf spark.emr-serverless.driver.cpu=4vCPU "
+                    "--conf spark.emr-serverless.driver.memory=16G "
+                    "--conf spark.emr-serverless.executor.cpu=4vCPU "
+                    "--conf spark.emr-serverless.executor.memory=16G "
+                    "--conf spark.emr-serverless.executor.disk=100G "
                     "--conf spark.executor.instances=2 "
                     "--conf spark.dynamicAllocation.enabled=false "
                     "--conf spark.sql.execution.arrow.pyspark.enabled=true"
@@ -327,6 +311,7 @@ with DAG(
         configuration_overrides=COMMON_CONFIGURATION_OVERRIDES,
     )
 
+    # Final Local Tasks: Database Load and Validation
     load_review_embeddings_to_pgvector = PythonOperator(
         task_id="load_review_embeddings_to_pgvector",
         python_callable=load_to_pgvector_wrapper,
@@ -340,7 +325,7 @@ with DAG(
 
     end = EmptyOperator(task_id="end")
 
-    # Dependency Graph
+    # Dependency Graph (Sequential execution as requested to manage EMR quota)
     start >> ingest_products >> transform_products >> validate_products >> ingest_reviews >> transform_reviews >> validate_reviews
     validate_reviews >> build_mlready_product_features >> validate_mlready_product_features
     validate_mlready_product_features >> build_mlready_user_features >> validate_mlready_user_features
