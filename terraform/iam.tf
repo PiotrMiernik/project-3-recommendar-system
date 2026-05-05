@@ -44,9 +44,9 @@ data "aws_iam_policy_document" "orchestrator_policy_doc" {
 
   # Required to attach the Runtime Role to the EMR Job
   statement {
-    sid    = "IamPassRole"
-    effect = "Allow"
-    actions = ["iam:PassRole"]
+    sid       = "IamPassRole"
+    effect    = "Allow"
+    actions   = ["iam:PassRole"]
     resources = [aws_iam_role.emr_serverless_runtime_role.arn]
     condition {
       test     = "StringLike"
@@ -115,9 +115,9 @@ data "aws_iam_policy_document" "s3_glue_runtime_policy" {
 
   # Read access for Raw, Staging, Spark Scripts and artifacts
   statement {
-    sid       = "ReadInputAndScripts"
-    effect    = "Allow"
-    actions   = ["s3:GetObject", "s3:GetObjectTagging"]
+    sid     = "ReadInputAndScripts"
+    effect  = "Allow"
+    actions = ["s3:GetObject", "s3:GetObjectTagging"]
     resources = [
       "arn:aws:s3:::${var.s3_bucket_name}/raw/*",
       "arn:aws:s3:::${var.s3_bucket_name}/staging/*",

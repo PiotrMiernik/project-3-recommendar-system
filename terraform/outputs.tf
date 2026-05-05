@@ -33,8 +33,13 @@ output "emr_serverless_runtime_role_arn" {
 }
 
 output "emr_serverless_application_id" {
-  description = "ID of the EMR Serverless Application"
+  description = "Standard EMR Serverless application ID for Spark ETL jobs"
   value       = aws_emrserverless_application.spark.id
+}
+
+output "emr_embeddings_application_id" {
+  description = "EMR Serverless application ID for Docker-based embeddings job"
+  value       = aws_emrserverless_application.embeddings.id
 }
 
 # ECR repository url

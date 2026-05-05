@@ -20,18 +20,13 @@ resource "aws_emrserverless_application" "spark" {
 
   auto_stop_configuration {
     enabled              = true
-    idle_timeout_minutes = 15 
+    idle_timeout_minutes = 15
   }
 
   maximum_capacity {
     cpu    = "20 vCPU"
     memory = "80 GB"
     disk   = "300 GB"
-  }
-
-  # Custom Image Configuration (REQUIRED to use your ECR image)
-  image_configuration {
-    image_uri = "${aws_ecr_repository.recommender_embeddings.repository_url}:latest"
   }
 
   monitoring_configuration {
@@ -43,5 +38,30 @@ resource "aws_emrserverless_application" "spark" {
   tags = {
     Project   = var.project_name
     Component = "emr-serverless"
+  }
+}
+
+resource "aws_emrserverless_application" "embeddings" {
+  name          = "${var.project_name}-embeddings-serverless"
+  release_label = "emr-7.9.0"
+  type          = "SPARK"
+
+  image_configuration {
+    image_uri = var.embeddings_ecr_image_uri
+  }
+
+  auto_start_configuration {
+    enabled = true
+  }
+
+  auto_stop_configuration {
+    enabled              = true
+    idle_timeout_minutes = 1
+  }
+
+  maximum_capacity {
+    cpu    = "12 vCPU"
+    memory = "48 GB"
+    disk   = "200 GB"
   }
 }
