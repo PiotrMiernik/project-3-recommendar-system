@@ -1,6 +1,6 @@
 # Project 3 – Recommender System Data Platform
 
-![CI](https://github.com/PiotrMiernik/project-3-recommender-system/actions/workflows/ci.yml/badge.svg)
+[![CI](https://github.com/PiotrMiernik/project-3-recommender-system/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/PiotrMiernik/project-3-recommender-system/actions/workflows/ci.yml)
 
 This project is an end-to-end recommendation system data platform built on AWS using modern data engineering and MLOps-oriented practices.
 
