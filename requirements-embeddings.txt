@@ -3,4 +3,4 @@ torch --index-url https://download.pytorch.org/whl/cpu
 pandas
 pyarrow
 boto3
-s3fs
+pyspark==3.5.0
