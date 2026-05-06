@@ -1,26 +1,26 @@
-# 1. Base: Official AWS EMR Serverless image for Spark
+# Base image: official AWS EMR Serverless Spark runtime
 FROM public.ecr.aws/emr-serverless/spark/emr-7.1.0:latest
 
-# 2. Switch to root to perform software installations
+# Use root only for installing dependencies and copying project files
 USER root
 
-# 3. Set working directory
-WORKDIR /app
-
-# 4. Copy requirements file from the root of your project
+# Install Python dependencies required by the embeddings job
 COPY requirements-embeddings.txt /tmp/requirements-embeddings.txt
-
-# 5. Install Python libraries using the EMR Python interpreter
-# --no-cache-dir reduces image size by not storing the installer files
 RUN python3 -m pip install --no-cache-dir -r /tmp/requirements-embeddings.txt
 
-# 6. Set environment variables to ensure Spark uses the correct Python paths
+# Store project code outside /app because EMR Serverless may use /app internally
+WORKDIR /opt/recommender
+
+# Copy project source code into the custom image
+COPY src/ /opt/recommender/src/
+
+# Ensure the EMR Serverless runtime user can read the project files
+RUN chown -R hadoop:hadoop /opt/recommender
+
+# Ensure Python can import modules from src/
+ENV PYTHONPATH=/opt/recommender
 ENV PYSPARK_PYTHON=/usr/bin/python3
 ENV PYSPARK_DRIVER_PYTHON=/usr/bin/python3
 
-# 7. Copy ONLY the necessary Python script and common utilities
-# We copy src/ to ensure any shared modules in src/common are available
-COPY src/ /app/src/
-
-# 8. Switch back to non-root user 'hadoop' (required by EMR Serverless)
-USER hadoop
+# Run EMR Serverless jobs as the expected non-root user
+USER hadoop:hadoop

@@ -61,7 +61,7 @@ PREPARE_REVIEWS_FOR_EMBEDDINGS_SCRIPT = (
 )
 
 # This script is located inside the custom Docker image used by the embeddings EMR application.
-GENERATE_REVIEW_EMBEDDINGS_SCRIPT = "/app/jobs/step2_generate_review_embeddings.py"
+GENERATE_REVIEW_EMBEDDINGS_SCRIPT = "/app/src/embeddings/step2_generate_review_embeddings.py"
 
 
 # ---------------------------------------------------------------------
