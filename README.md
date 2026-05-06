@@ -1,13 +1,12 @@
 # Project 3 – Recommender System Data Platform
 
-
 ![CI](https://github.com/PiotrMiernik/project-3-recommender-system/actions/workflows/ci.yml/badge.svg)
 
 This project is an end-to-end recommendation system data platform built on AWS using modern data engineering and MLOps-oriented practices.
 
 The platform ingests raw product metadata and user reviews, processes them through a layered data architecture, generates ML-ready feature tables, and creates vector embeddings for downstream recommendation and retrieval use cases.
 
-The project focuses on scalable batch data processing, feature engineering, vector search preparation, and production-oriented orchestration using MongoDB, Apache Airflow, AWS EMR Serverless (Spark), Docker (AWD ECR), Apache Iceberg, and pgvector.
+The project focuses on scalable batch data processing, feature engineering, vector search preparation, and production-oriented orchestration using MongoDB, Apache Airflow, AWS EMR Serverless (Spark), Docker (AWS ECR), Apache Iceberg, and pgvector.
 
 ---
 
@@ -31,6 +30,7 @@ The project simulates a realistic recommendation system backend architecture tha
 
 # Key Features
 
+- JSON manifest generation for raw ingestion traceability and batch metadata tracking
 - Layered data architecture: Raw → Staging → ML-ready
 - Batch-oriented scalable processing using PySpark on AWS EMR Serverless
 - Iceberg-based feature store for ML-ready datasets
@@ -95,8 +95,8 @@ project-3-recommender-system/
 │   │       ├── setup_recommender.sql
 │   │       └── test.sql
 │   │
-│   ├── data_validation                  # Great Expectations and validation scripts
-│   │   ├── gx_results
+│   ├── data_validation                  # Great Expectations, validation scripts and gx validation results
+│   │   ├── gx_results                   # JSON outputs from Great Expectations validation runs
 │   │   ├── validate_mlready_product_features.py
 │   │   ├── validate_mlready_product_review_stats.py
 │   │   ├── validate_mlready_user_features.py
@@ -146,6 +146,7 @@ project-3-recommender-system/
 │
 └── .github/workflows                    # GitHub Actions CI workflows
     └── ci.yml
+```
 
 ---
 
@@ -159,8 +160,8 @@ The platform uses a layered architecture designed for scalable batch processing 
 
 The project simulates production-like source systems by manually creating and loading databases using Amazon review datasets:
 
-MongoDB Atlas – user reviews dataset
-AWS RDS PostgreSQL – product metadata dataset
+- MongoDB Atlas – user reviews dataset
+- AWS RDS PostgreSQL – product metadata dataset
 
 The raw source data originates from Amazon product review datasets and is loaded into dedicated MongoDB and PostgreSQL databases before ingestion into the pipeline.
 
@@ -168,19 +169,24 @@ The raw source data originates from Amazon product review datasets and is loaded
 
 # Storage Layers
 
-Raw Layer
-    Stores raw JSONL GZ files in Amazon S3
-    Append-only ingestion approach
-    Includes ingestion manifests
-    Simulates production-style immutable raw storage
-Staging Layer
-    Cleaned and normalized Parquet datasets
-    Built using PySpark transformations on EMR Serverless
-    Standardized schemas and data types
-ML-ready Layer
-    Iceberg tables containing feature-engineered datasets
-    Optimized for downstream ML and analytics workloads
-    Stored in S3 and managed through Glue Catalog
+## Raw Layer
+
+- Stores raw JSONL GZ files in Amazon S3
+- Append-only ingestion approach
+- Each ingestion batch generates JSON manifest metadata files for traceability and auditability
+- Simulates production-style immutable raw storage
+
+## Staging Layer
+
+- Cleaned and normalized Parquet datasets
+- Built using PySpark transformations on EMR Serverless
+- Standardized schemas and data types
+
+## ML-ready Layer
+
+- Iceberg tables containing feature-engineered datasets
+- Optimized for downstream ML and analytics workloads
+- Stored in S3 and managed through Glue Catalog
 
 ---
 
@@ -192,26 +198,28 @@ The pipeline executes sequentially to reduce EMR Serverless resource contention 
 
 Main workflow stages:
 
-Raw ingestion from MongoDB and PostgreSQL
-Raw → Staging transformations
-Staging data quality validation
-ML-ready feature engineering
-ML-ready data quality validation
-Product reviews preparation and filtering
-Prepared product reviews quality validation
-Embedding generation
-Loading vectors into pgvector
+1. Raw ingestion from MongoDB and PostgreSQL
+2. Raw → Staging transformations
+3. Staging data quality validation
+4. ML-ready feature engineering
+5. ML-ready data quality validation
+6. Product reviews preparation and filtering
+7. Prepared product reviews quality validation
+8. Embedding generation
+9. Loading vectors into pgvector
 
 ---
+
 # ML-ready Feature Store
 
 The ML-ready layer consists of four Iceberg tables:
 
-Table	                    Purpose
-product_features	        Product metadata and engineered product-level features
-user_features	            Aggregated user-level behavioral features
-product_review_stats	    Product review statistics and quality metrics
-user_product_interactions	User-product interaction dataset
+| Table                        | Purpose                                               |
+|------------------------------|-------------------------------------------------------|
+| `product_features`           | Product metadata and engineered product-level features 
+| `user_features`              | Aggregated user-level behavioral features 
+| `product_review_stats`       | Product review statistics and quality metrics 
+| `user_product_interactions`  | User-product interaction dataset 
 
 These datasets are designed for downstream recommendation models and analytical workloads.
 
@@ -221,50 +229,55 @@ These datasets are designed for downstream recommendation models and analytical 
 
 The embeddings pipeline transforms review text into vector representations suitable for semantic search and recommendation systems.
 
-Main Processing Steps
-    Clean review text
-    Decode HTML entities
-    Normalize whitespace
-    Build unified text input from summary + review text
-    Generate embeddings using Sentence Transformers
-    Normalize vectors
-    Store vectors in PostgreSQL with pgvector
+## Main Processing Steps
 
-Incremental Processing
+- Clean review text
+- Decode HTML entities
+- Normalize whitespace
+- Build unified text input from summary + review text
+- Generate embeddings using Sentence Transformers
+- Normalize vectors
+- Store vectors in PostgreSQL with pgvector
+
+## Incremental Processing
+
 The pipeline supports incremental processing using:
-    review_id
-    text_hash
-    model_version
+
+- `review_id`
+- `text_hash`
+- `model_version`
+
 This prevents unnecessary re-generation of existing embeddings.
 
 ---
 
 # Technologies Used
 
-    Python 3.11+
-    Apache Airflow
-    Apache Spark / PySpark
-    AWS EMR Serverless
-    AWS S3
-    AWS RDS PostgreSQL
-    AWS ECR
-    MongoDB Atlas
-    PostgreSQL pgvector
-    Apache Iceberg
-    Docker
-    Great Expectations
-    Terraform
-    GitHub Actions
-    Sentence Transformers
+- Python 3.11+
+- Apache Airflow
+- Apache Spark / PySpark
+- AWS EMR Serverless
+- AWS S3
+- AWS RDS PostgreSQL
+- AWS ECR
+- MongoDB Atlas
+- PostgreSQL pgvector
+- Apache Iceberg
+- Docker
+- Great Expectations
+- Terraform
+- GitHub Actions
+- Sentence Transformers
 
 ---
 
 # CI/CD Workflows
 
-File	                    Purpose
-.github/workflows/ci.yml	Runs lightweight smoke and unit tests
+| File                       | Purpose                               |
+|----------------------------|---------------------------------------|
+| `.github/workflows/ci.yml` | Runs lightweight smoke and unit tests |
 
-The CI pipeline automatically validates the project on pushes to the dev branch and pull requests to main.
+The CI pipeline automatically validates the project on pushes to the `dev` branch and pull requests to `main`.
 
 ---
 
@@ -272,18 +285,25 @@ The CI pipeline automatically validates the project on pushes to the dev branch 
 
 The project includes multiple validation layers.
 
-Code Validation
-    Smoke tests for critical project modules
-    Unit tests for embedding text preprocessing logic
-Data Validation
-    Great Expectations validation for staging and ML-ready datasets
-    SQL-based data product validation checks
-Final Data Product Checks
+## Code Validation
+
+- Smoke tests for critical project modules
+- Unit tests for embedding text preprocessing logic
+
+## Data Validation
+
+- Great Expectations validation for staging and ML-ready datasets
+- Validation results are persisted as JSON artifacts for auditability and troubleshooting
+- SQL checks verifying final ML-ready tables and pgvector embeddings
+
+## Final Data Product Checks
+
 Final SQL checks verify:
-    Existence of ML-ready Iceberg tables
-    Row counts and key column quality
-    Pgvector embeddings integrity
-    Embedding vector dimensions
+
+- Existence of ML-ready Iceberg tables
+- Row counts and key column quality
+- pgvector embeddings integrity
+- Embedding vector dimensions
 
 ---
 
@@ -291,39 +311,43 @@ Final SQL checks verify:
 
 Several architectural changes were introduced during development:
 
-    Switched from parallel to sequential Airflow execution due to EMR Serverless resource contention
-    Introduced Docker-based embeddings generation after dependency conflicts in EMR environments
-    Implemented incremental embeddings logic using text_hash and model_version
-    Simplified CI to lightweight unit testing instead of full pipeline execution
-    Used Iceberg tables for scalable ML-ready feature storage
-    Separated tabular ML-ready features from vector embeddings storage
-    Added SQL-based downstream data product validation checks
+- Switched from parallel to sequential Airflow execution due to EMR Serverless resource contention
+- Introduced Docker-based embeddings generation after dependency conflicts in EMR environments
+- Implemented incremental embeddings logic using `text_hash` and `model_version`
+- Simplified CI to lightweight unit testing instead of full pipeline execution
+- Used Iceberg tables for scalable ML-ready feature storage
+- Separated tabular ML-ready features from vector embeddings storage
+- Added SQL-based downstream data product validation checks
 
 ---
 
 # Output
 
 The final outputs of the project are:
-    ML-ready Iceberg feature tables stored in S3
-    Review embeddings stored in PostgreSQL pgvector
-    Query-ready datasets for downstream ML systems
-    Validated data products ready for analytics and recommendation workloads
+
+- ML-ready Iceberg feature tables stored in S3
+- Review embeddings stored in PostgreSQL pgvector
+- Query-ready datasets for downstream ML systems
+- Validated data products ready for analytics and recommendation workloads
 
 ---
 
 # Future Improvements
 
 Potential future improvements:
-    Real-time streaming ingestion with Kafka
-    Online feature store
-    ANN vector indexing optimization
-    Automated model training pipeline
-    Kubernetes-based orchestration
-    Full deployment automation pipeline
+
+- Real-time streaming ingestion with Kafka
+- Online feature store
+- ANN vector indexing optimization
+- Automated model training pipeline
+- Kubernetes-based orchestration
+- Full deployment automation pipeline
 
 ---
 
 # License
 
 This project is licensed under the terms of the LICENSE file.
-Created by Piotr Miernik – 2026
+
+Created by **Piotr Miernik – 2026**
+
