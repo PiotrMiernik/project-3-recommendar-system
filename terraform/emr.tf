@@ -69,9 +69,9 @@ resource "aws_emrserverless_application" "embeddings" {
   }
 
   maximum_capacity {
-    cpu    = "12 vCPU"
-    memory = "48 GB"
-    disk   = "200 GB"
+    cpu    = "24 vCPU"
+    memory = "96 GB"
+    disk   = "500 GB"
   }
 
   monitoring_configuration {

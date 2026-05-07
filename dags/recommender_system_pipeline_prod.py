@@ -61,7 +61,7 @@ PREPARE_REVIEWS_FOR_EMBEDDINGS_SCRIPT = (
 )
 
 # This script is located inside the custom Docker image used by the embeddings EMR application.
-GENERATE_REVIEW_EMBEDDINGS_SCRIPT = "/app/src/embeddings/step2_generate_review_embeddings.py"
+GENERATE_REVIEW_EMBEDDINGS_SCRIPT = "/opt/recommender/src/embeddings/step2_generate_review_embeddings.py"
 
 
 # ---------------------------------------------------------------------
@@ -112,16 +112,28 @@ EMBEDDINGS_CONFIGURATION_OVERRIDES = {
         {
             "classification": "spark-defaults",
             "properties": {
+                # Python runtime inside Docker image
                 "spark.pyspark.python": "/usr/bin/python3",
                 "spark.pyspark.driver.python": "/usr/bin/python3",
+
+                # Make project modules importable from /opt/recommender
+                "spark.emr-serverless.driverEnv.PYTHONPATH": "/opt/recommender",
+                "spark.executorEnv.PYTHONPATH": "/opt/recommender",
+
+                # AWS / S3 configuration
                 "spark.emr-serverless.driverEnv.AWS_REGION": AWS_REGION,
                 "spark.executorEnv.AWS_REGION": AWS_REGION,
+
                 "spark.emr-serverless.driverEnv.S3_BUCKET": S3_BUCKET,
                 "spark.executorEnv.S3_BUCKET": S3_BUCKET,
+
                 "spark.emr-serverless.driverEnv.S3_STAGING_PREFIX": S3_STAGING_PREFIX,
                 "spark.executorEnv.S3_STAGING_PREFIX": S3_STAGING_PREFIX,
+
+                # Embedding model configuration
                 "spark.emr-serverless.driverEnv.EMBEDDING_MODEL_VERSION": "all-MiniLM-L6-v2",
                 "spark.executorEnv.EMBEDDING_MODEL_VERSION": "all-MiniLM-L6-v2",
+
                 "spark.emr-serverless.driverEnv.EMBEDDING_BATCH_SIZE": "32",
                 "spark.executorEnv.EMBEDDING_BATCH_SIZE": "32",
             },
@@ -427,10 +439,11 @@ with DAG(
                 "sparkSubmitParameters": (
                     "--conf spark.emr-serverless.driver.cpu=4vCPU "
                     "--conf spark.emr-serverless.driver.memory=16G "
+                    "--conf spark.emr-serverless.driver.disk=100G "
                     "--conf spark.emr-serverless.executor.cpu=4vCPU "
                     "--conf spark.emr-serverless.executor.memory=16G "
                     "--conf spark.emr-serverless.executor.disk=100G "
-                    "--conf spark.executor.instances=2 "
+                    "--conf spark.executor.instances=3 "
                     "--conf spark.dynamicAllocation.enabled=false "
                     "--conf spark.sql.execution.arrow.pyspark.enabled=true"
                 ),
@@ -438,6 +451,8 @@ with DAG(
         },
         configuration_overrides=EMBEDDINGS_CONFIGURATION_OVERRIDES,
         aws_conn_id=AWS_CONN_ID,
+        waiter_delay=60,
+        waiter_max_attempts=180,
     )
 
     # -----------------------------------------------------------------
