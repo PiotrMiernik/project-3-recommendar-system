@@ -9,8 +9,8 @@ FROM mlready.user_features
 
 UNION ALL
 
-SELECT 'product_review_stats' AS table_name, COUNT(*) AS row_count
-FROM mlready.product_review_stats
+SELECT 'global_stats' AS table_name, COUNT(*) AS row_count
+FROM mlready.global_stats
 
 UNION ALL
 
