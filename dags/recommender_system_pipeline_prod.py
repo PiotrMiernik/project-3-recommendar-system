@@ -123,17 +123,22 @@ EMBEDDINGS_CONFIGURATION_OVERRIDES = {
                 # AWS / S3 configuration
                 "spark.emr-serverless.driverEnv.AWS_REGION": AWS_REGION,
                 "spark.executorEnv.AWS_REGION": AWS_REGION,
-
                 "spark.emr-serverless.driverEnv.S3_BUCKET": S3_BUCKET,
                 "spark.executorEnv.S3_BUCKET": S3_BUCKET,
-
                 "spark.emr-serverless.driverEnv.S3_STAGING_PREFIX": S3_STAGING_PREFIX,
                 "spark.executorEnv.S3_STAGING_PREFIX": S3_STAGING_PREFIX,
 
-                # Embedding model configuration
-                "spark.emr-serverless.driverEnv.EMBEDDING_MODEL_VERSION": "all-MiniLM-L6-v2",
-                "spark.executorEnv.EMBEDDING_MODEL_VERSION": "all-MiniLM-L6-v2",
+                # Use the embedding model cached inside the Docker image
+                "spark.emr-serverless.driverEnv.EMBEDDING_MODEL_VERSION": "/opt/recommender/models/all-MiniLM-L6-v2",
+                "spark.executorEnv.EMBEDDING_MODEL_VERSION": "/opt/recommender/models/all-MiniLM-L6-v2",
 
+                # Force offline mode to prevent runtime downloads from Hugging Face
+                "spark.emr-serverless.driverEnv.TRANSFORMERS_OFFLINE": "1",
+                "spark.executorEnv.TRANSFORMERS_OFFLINE": "1",
+                "spark.emr-serverless.driverEnv.HF_HUB_OFFLINE": "1",
+                "spark.executorEnv.HF_HUB_OFFLINE": "1",
+
+                # Batch size for embedding inference
                 "spark.emr-serverless.driverEnv.EMBEDDING_BATCH_SIZE": "32",
                 "spark.executorEnv.EMBEDDING_BATCH_SIZE": "32",
             },

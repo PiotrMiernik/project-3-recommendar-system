@@ -1,0 +1,34 @@
+{
+    "execution_timestamp_utc": "2026-05-08T18:54:52.827587+00:00",
+    "database_name": "recommender",
+    "schema_name": "vector",
+    "table_name": "review_embeddings",
+    "expected_vector_dimension": 384,
+    "overall_status": "success",
+    "checks": [
+        {
+            "check_name": "table_not_empty",
+            "metric_value": 806402,
+            "expected_condition": "count > 0",
+            "passed": true
+        },
+        {
+            "check_name": "no_nulls_in_required_columns",
+            "metric_value": 0,
+            "expected_condition": "count = 0",
+            "passed": true
+        },
+        {
+            "check_name": "no_duplicate_review_id",
+            "metric_value": 0,
+            "expected_condition": "count = 0",
+            "passed": true
+        },
+        {
+            "check_name": "all_embeddings_have_expected_dimension",
+            "metric_value": 0,
+            "expected_condition": "count = 0 for vector_dims(embedding) != 384",
+            "passed": true
+        }
+    ]
+}

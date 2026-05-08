@@ -39,7 +39,7 @@ def load_settings() -> Dict[str, Any]:
         "rds_dbname": os.getenv("RDS_DBNAME"),
         "rds_user": os.getenv("RDS_USER"),
         "rds_password": os.getenv("RDS_PASSWORD"),
-        "chunk_size": int(os.getenv("CHUNK_SIZE", "5000")),
+        "chunk_size": int(os.getenv("CHUNK_SIZE", "500")),
     }
 
 
@@ -75,30 +75,6 @@ def list_parquet_keys(
                 parquet_keys.append(key)
 
     return parquet_keys
-
-
-def read_parquet_files_from_s3(
-    s3_client,
-    bucket: str,
-    parquet_keys: List[str],
-) -> pd.DataFrame:
-    """
-    Download parquet files from S3 and concatenate them into one DataFrame.
-    """
-    dataframes: List[pd.DataFrame] = []
-
-    for key in parquet_keys:
-        logger.info(f"Downloading parquet file: s3://{bucket}/{key}")
-
-        with tempfile.NamedTemporaryFile(suffix=".parquet") as tmp_file:
-            s3_client.download_file(bucket, key, tmp_file.name)
-            df = pd.read_parquet(tmp_file.name)
-            dataframes.append(df)
-
-    if not dataframes:
-        return pd.DataFrame()
-
-    return pd.concat(dataframes, ignore_index=True)
 
 
 def validate_required_columns(df: pd.DataFrame) -> None:
@@ -245,6 +221,8 @@ def upsert_records(conn, records: List[tuple], chunk_size: int) -> None:
 def run_load_review_embeddings_to_pgvector(ingest_dt: Optional[str] = None) -> None:
     """
     Main entrypoint for loading review embeddings from S3 to pgvector.
+
+    This version processes one Parquet file at a time to reduce memory usage.
     """
     settings = load_settings()
 
@@ -258,33 +236,54 @@ def run_load_review_embeddings_to_pgvector(ingest_dt: Optional[str] = None) -> N
     if not parquet_keys:
         raise ValueError(f"No parquet files found under s3://{bucket}/{prefix}")
 
-    df = read_parquet_files_from_s3(
-        s3_client=s3_client,
-        bucket=bucket,
-        parquet_keys=parquet_keys,
-    )
-
-    if df.empty:
-        raise ValueError("Input DataFrame is empty after reading parquet files.")
-
-    validate_required_columns(df)
-
-    records = prepare_records(df)
-
-    if not records:
-        raise ValueError("No records prepared for PostgreSQL upsert.")
-
-    logger.info(f"Prepared {len(records)} records for pgvector upsert.")
+    logger.info(f"Found {len(parquet_keys)} parquet files to load.")
 
     conn = None
+    total_loaded = 0
+
     try:
         conn = get_db_connection(settings)
-        upsert_records(
-            conn=conn,
-            records=records,
-            chunk_size=settings["chunk_size"],
+
+        for key in parquet_keys:
+            logger.info(f"Processing parquet file: s3://{bucket}/{key}")
+
+            with tempfile.NamedTemporaryFile(suffix=".parquet") as tmp_file:
+                s3_client.download_file(bucket, key, tmp_file.name)
+
+                df = pd.read_parquet(tmp_file.name)
+
+                if df.empty:
+                    logger.warning(f"Skipping empty parquet file: s3://{bucket}/{key}")
+                    continue
+
+                validate_required_columns(df)
+
+                records = prepare_records(df)
+
+                if not records:
+                    logger.warning(f"No records prepared from file: s3://{bucket}/{key}")
+                    continue
+
+                upsert_records(
+                    conn=conn,
+                    records=records,
+                    chunk_size=settings["chunk_size"],
+                )
+
+                total_loaded += len(records)
+
+                logger.info(
+                    f"Loaded {len(records)} records from {key}. "
+                    f"Total loaded so far: {total_loaded}"
+                )
+
+                del df
+                del records
+
+        logger.info(
+            f"Review embeddings loaded to pgvector successfully. "
+            f"Total records processed: {total_loaded}"
         )
-        logger.info("Review embeddings loaded to pgvector successfully.")
 
     except Exception as exc:
         if conn is not None:
@@ -296,7 +295,6 @@ def run_load_review_embeddings_to_pgvector(ingest_dt: Optional[str] = None) -> N
         if conn is not None:
             conn.close()
 
-
 if __name__ == "__main__":
     import argparse
 
@@ -304,7 +302,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--ingest-dt",
         required=False,
-        help="Optional ingest_dt partition to load, for example: 2026-04-17",
+        help="Optional ingest_dt partition to load, for example: 2026-05-05",
     )
     args = parser.parse_args()
 
