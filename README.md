@@ -81,7 +81,7 @@ project-3-recommender-system/
 │   │   └── spark_utils.py
 │   │
 │   ├── data_product_check               # Final SQL-based data product validation checks
-│   │   ├── mlready_tables_chcek.sql
+│   │   ├── mlready_tables_check.sql
 │   │   └── pgvector_embeddings_check.sql
 │   │
 │   ├── data_sources                     # Source database setup scripts
